@@ -1,0 +1,18 @@
+# Dependencies :)
+node_modules/
+
+# Environment variables — Make sure you do not commit this maneeeee
+.env
+
+# Database file — this has real ppl data dont mess wid it 
+*.db
+*.db-journal
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
