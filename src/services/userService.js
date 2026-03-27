@@ -1,7 +1,13 @@
+/**
+ * Author: Kennedy Castillon Jimenez
+ * Date: March 26th, 2026
+ * Summary: Our user service where we either create, get or update
+ */
+
 const { db } = require("../db/database");
 const crypto = require("crypto");
 
-// Generate a simple unique user code like: "kennedy_a3f2"
+// Generate a simple unique user code like: "kennedy_cd64"
 const generateUserCode = (name) => {
   const slug = name.toLowerCase().split(" ")[0];
   const suffix = crypto.randomBytes(2).toString("hex");
