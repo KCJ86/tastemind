@@ -47,7 +47,7 @@ app.use(express.json()); // parse JSON bodies
 app.use(express.static(path.join(__dirname, "../public"))); // serve frontend
 
 // ─── Routes (we'll add these next) ────────────────────
-// app.use('/api/v1/users', require('./routes/users'));
+app.use("/api/v1/users", require("./routes/users"));
 // app.use('/api/v1/recommend', require('./routes/recommend'));
 // app.use('/api/v1/visits', require('./routes/visits'));
 // app.use('/api/v1/reservations', require('./routes/reservations'));
