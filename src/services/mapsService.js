@@ -6,35 +6,56 @@
 
 const axios = require("axios");
 
-const PLACES_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json";
+const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
 
 const PRICE_MAP = { $: 1, $$: 2, $$$: 3, $$$$: 4 };
 
 const searchRestaurant = async (query, priceRange) => {
-  const params = {
-    query,
-    type: "restaurant",
-    key: process.env.GOOGLE_MAPS_API_KEY,
-  };
+  console.log(
+    "🔑 Key loaded:",
+    process.env.GOOGLE_MAPS_API_KEY ? "YES" : "MISSING",
+  );
 
-  if (priceRange && PRICE_MAP[priceRange]) {
-    params.maxprice = PRICE_MAP[priceRange];
+  try {
+    const response = await axios.post(
+      PLACES_URL,
+      {
+        textQuery: query,
+        includedType: "restaurant",
+        maxResultCount: 3,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.location",
+        },
+      },
+    );
+
+    console.log(
+      "🗺️ Google Places raw response:",
+      JSON.stringify(response.data, null, 2),
+    );
+
+    const results = response.data.places || [];
+
+    return results.map((p) => ({
+      place_id: p.id,
+      name: p.displayName?.text,
+      address: p.formattedAddress,
+      rating: p.rating,
+      total_ratings: p.userRatingCount,
+      price_level: p.priceLevel,
+      open_now: p.regularOpeningHours?.openNow,
+      location: p.location,
+    }));
+  } catch (err) {
+    console.error("🗺️ Maps error:", err.response?.data || err.message);
+    return [];
   }
-
-  const { data } = await axios.get(PLACES_URL, { params });
-  const results = data.results?.slice(0, 3) || [];
-
-  return results.map((p) => ({
-    place_id: p.place_id,
-    name: p.name,
-    address: p.formatted_address,
-    rating: p.rating,
-    total_ratings: p.user_ratings_total,
-    price_level: p.price_level,
-    open_now: p.opening_hours?.open_now,
-    location: p.geometry?.location,
-  }));
 };
 
 const getRestaurantDetails = async (place_id) => {
