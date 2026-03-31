@@ -16,3 +16,6 @@ Thumbs.db
 logs/
 *.log
 npm-debug.log*
+
+
+# we aint pushing silly tings oonto github 
