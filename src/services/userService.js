@@ -115,7 +115,7 @@ const saveVisit = (user_id, restaurant) => {
     .run(
       user_id,
       restaurant.place_id,
-      restaurant.name,
+      restaurant.restaurant_name,
       restaurant.cuisine_type || null,
       restaurant.price_level || null,
       restaurant.address || null,
