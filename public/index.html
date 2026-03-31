@@ -1,0 +1,125 @@
+<!doctype html>
+
+<!-- Author: Kennedy Castillon Jimenez-->
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TasteMind — Your AI Dining Concierge</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <!-- HEADER -->
+    <header>
+      <div class="logo">Taste<span>Mind</span></div>
+      <div class="header-right" id="header-right">
+        <button class="nav-btn" onclick="showScreen('onboard')">Sign in</button>
+      </div>
+    </header>
+
+    <!-- ONBOARDING SCREEN -->
+    <div class="screen active" id="screen-onboard">
+      <div class="onboard-inner">
+        <div class="eyebrow">AI Dining Concierge</div>
+        <h1 class="hero-title">Eat <em>better,</em><br />every time</h1>
+        <p class="hero-sub">
+          Tell TasteMind what you're craving. It remembers what you love, learns
+          from every meal, and gets smarter with every recommendation.
+        </p>
+
+        <div class="onboard-form">
+          <div class="input-group">
+            <input
+              class="fancy-input"
+              type="text"
+              id="new-name"
+              placeholder="Your first name"
+            />
+            <input
+              class="fancy-input"
+              type="text"
+              id="new-location"
+              placeholder="Your city (e.g. San Diego)"
+            />
+          </div>
+          <button class="cta-btn" id="create-user-btn">
+            Start my taste profile →
+          </button>
+
+          <div class="or-divider">returning?</div>
+
+          <div class="returning-input">
+            <input
+              class="fancy-input"
+              type="text"
+              id="returning-code"
+              placeholder="Enter your user code"
+            />
+            <button class="ghost-btn" id="load-user-btn">Enter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN APP SCREEN -->
+    <div class="screen" id="screen-app">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="sidebar-label">What are you craving?</div>
+          <textarea
+            class="craving-area"
+            id="craving-input"
+            placeholder="e.g. something cozy and warm, maybe pasta… or I want to try something totally new tonight"
+            rows="4"
+          ></textarea>
+          <button class="ask-btn" id="ask-btn">
+            <span>✦</span> Ask TasteMind
+          </button>
+        </div>
+
+        <div class="profile-section">
+          <div class="sidebar-label">Your palate</div>
+          <div class="taste-tags" id="taste-tags">
+            <span class="taste-tag">No preferences yet</span>
+          </div>
+        </div>
+
+        <div class="history-section">
+          <div class="sidebar-label" style="margin-bottom: 12px">
+            Recent visits
+          </div>
+          <div id="history-list">
+            <div class="empty-history">No visits yet</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="main-content" id="main-content">
+        <div class="empty-state" id="empty-state">
+          <div class="empty-glyph">✦</div>
+          <div class="empty-title">Where shall we dine tonight?</div>
+          <div class="empty-sub">
+            Describe your craving in the panel and let TasteMind find your
+            perfect meal.
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- MODAL & TOAST -->
+    <div id="modal-container"></div>
+    <div class="toast" id="toast"></div>
+
+    <!-- SCRIPTS — order matters -->
+    <script src="/js/api.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/js/app.js"></script>
+  </body>
+</html>
