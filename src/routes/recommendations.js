@@ -41,7 +41,7 @@ router.post(
 
       const recentVisits = getRecentVisits(user.id, 10);
 
-      // 2. Claude generates personalized search queries + reasoning
+      // 2. Claude generates one focused recommendation
       const claudeResponse = await getRestaurantRecommendations(
         user,
         recentVisits,
@@ -49,24 +49,18 @@ router.post(
         location,
       );
 
-      // 3. Hit Google Places for each recommendation
-      const results = await Promise.all(
-        claudeResponse.recommendations.map(async (rec) => {
-          const places = await searchRestaurant(
-            rec.search_query,
-            rec.price_range,
-          );
-          return {
-            ...rec,
-            places,
-          };
-        }),
+      // 3. Hit Google Places once for that recommendation
+      const places = await searchRestaurant(
+        claudeResponse.search_query,
+        claudeResponse.price_range,
       );
 
       res.json({
         success: true,
         summary: claudeResponse.summary,
-        recommendations: results,
+        category: claudeResponse.category,
+        reason: claudeResponse.reason,
+        places,
       });
     } catch (err) {
       console.error(err);

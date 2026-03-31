@@ -61,20 +61,16 @@ ${visitHistory}
 
 Their craving right now: "${craving}"
 
-Based on all of this, generate exactly 3 restaurant search queries for Google Places.
-For each, provide a personalized reason WHY you're suggesting it based on their history and mood.
+Based on all of this, generate exactly 1 restaurant category that best matches their craving and mood.
+Then provide a search query for Google Places to find the best options.
 
 Respond ONLY with this JSON shape:
 {
   "summary": "one sentence describing what you understood about their mood/craving",
-  "recommendations": [
-    {
-      "search_query": "specific search term for Google Places e.g. 'cozy Italian trattoria San Diego'",
-      "cuisine_type": "Italian",
-      "reason": "personalized reason referencing their history e.g. you rated Italian highly last month and wanted something cozy",
-      "price_range": "$$"
-    }
-  ]
+  "category": "Italian",
+  "search_query": "cozy Italian trattoria San Diego",
+  "reason": "personalized reason referencing their history",
+  "price_range": "$$"
 }`;
 
   const message = await client.messages.create({
