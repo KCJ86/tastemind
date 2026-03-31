@@ -91,6 +91,48 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  // Toggle user dropdown
+  if (e.target.closest("#user-pill")) {
+    const dropdown = document.getElementById("user-dropdown");
+    if (dropdown) {
+      const isOpen = dropdown.style.display !== "none";
+      dropdown.style.display = isOpen ? "none" : "block";
+    }
+    return;
+  }
+
+  // Copy user code
+  if (e.target.closest("#copy-code-btn")) {
+    navigator.clipboard.writeText(state.currentUser.user_code);
+    ui.showToast("Code copied to clipboard! ✦", "gold");
+    return;
+  }
+
+  // Go home
+  if (e.target.closest("#dropdown-home")) {
+    document.getElementById("user-dropdown").style.display = "none";
+    ui.showScreen("onboard");
+    return;
+  }
+
+  // Sign out
+  if (e.target.closest("#dropdown-signout")) {
+    localStorage.removeItem("tm_user_code");
+    state.currentUser = null;
+    document.getElementById("header-right").innerHTML = `
+    <button class="nav-btn">Sign in</button>
+  `;
+    ui.showScreen("onboard");
+    ui.showToast("Signed out successfully");
+    return;
+  }
+
+  // Close dropdown when clicking outside
+  if (!e.target.closest("#user-pill")) {
+    const dropdown = document.getElementById("user-dropdown");
+    if (dropdown) dropdown.style.display = "none";
+  }
+
   // Rate a meal nav btn
   if (e.target.closest("#rate-btn")) {
     handleRatePrompt();
@@ -164,21 +206,24 @@ async function fetchAndEnterApp(code) {
 
 function enterApp() {
   ui.showScreen("app");
-  ui.renderHeader(state.currentUser);
-  ui.renderTasteTags(state.currentUser);
-  refreshHistory();
+  refreshHistory().then((visits) => {
+    ui.renderHeader(state.currentUser, visits ? visits.length : 0);
+    ui.renderTasteTags(state.currentUser);
+  });
 }
 
 // ── HISTORY ────────────────────────────────────────
 async function refreshHistory() {
   try {
     const data = await api.getVisits(state.currentUser.user_code);
-    ui.renderHistory(data.visits || []);
+    const visits = data.visits || [];
+    ui.renderHistory(visits);
+    return visits;
   } catch {
     ui.renderHistory([]);
+    return [];
   }
 }
-
 // ── RECOMMENDATIONS ────────────────────────────────
 async function handleGetRecommendations() {
   const craving = document.getElementById("craving-input").value.trim();

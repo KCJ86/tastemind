@@ -41,7 +41,7 @@ const ui = {
   },
 
   // ── HEADER ────────────────────────────────────────
-  renderHeader: (user) => {
+  renderHeader: (user, visitCount = 0) => {
     const initials = user.name
       .split(" ")
       .map((w) => w[0])
@@ -49,13 +49,48 @@ const ui = {
       .slice(0, 2)
       .toUpperCase();
 
+    const liked = JSON.parse(user.liked_cuisines || "[]");
+
     document.getElementById("header-right").innerHTML = `
-      <div class="user-pill">
-        <div class="user-avatar">${initials}</div>
-        ${user.name}
+    <div class="user-pill" id="user-pill">
+      <div class="user-avatar">${initials}</div>
+      ${user.name}
+      <div class="user-dropdown" id="user-dropdown" style="display:none">
+
+        <div class="dropdown-header">
+          <div class="dropdown-name">${user.name}</div>
+          <div class="dropdown-location">📍 ${user.location || "No location set"}</div>
+          <div class="dropdown-code" id="copy-code-btn">
+            <div>
+              <div class="dropdown-code-label">Your return code</div>
+              <div class="dropdown-code-value">${user.user_code}</div>
+            </div>
+            <div class="dropdown-copy">copy</div>
+          </div>
+        </div>
+
+        <div class="dropdown-stats">
+          <div class="dropdown-stat">
+            <div class="dropdown-stat-value">${visitCount}</div>
+            <div class="dropdown-stat-label">Visits</div>
+          </div>
+          <div class="dropdown-stat">
+            <div class="dropdown-stat-value">${liked.length}</div>
+            <div class="dropdown-stat-label">Cuisines</div>
+          </div>
+        </div>
+
+        <div class="dropdown-item" id="dropdown-home">
+          <span class="dropdown-icon">🏠</span> Go to home
+        </div>
+        <div class="dropdown-item danger" id="dropdown-signout">
+          <span class="dropdown-icon">→</span> Sign out
+        </div>
+
       </div>
-      <button class="nav-btn" id="rate-btn">Rate a meal</button>
-    `;
+    </div>
+    <button class="nav-btn" id="rate-btn">Rate a meal</button>
+  `;
   },
 
   // ── TASTE TAGS ────────────────────────────────────
