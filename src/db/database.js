@@ -23,10 +23,11 @@ const initDb = () => {
     CREATE TABLE IF NOT EXISTS taste_profiles (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
-      liked_cuisines TEXT DEFAULT '[]',    -- JSON array e.g. ["Italian", "Thai"]
-      disliked_cuisines TEXT DEFAULT '[]', -- JSON array e.g. ["Seafood"]
-      preferred_price_range TEXT DEFAULT '$$', -- $, $$, $$$, $$$$
-      dietary_restrictions TEXT DEFAULT '[]',  -- JSON array e.g. ["vegetarian"]
+      liked_cuisines TEXT DEFAULT '[]',
+      disliked_cuisines TEXT DEFAULT '[]',
+      preferred_price_range TEXT DEFAULT '$$',
+      dietary_restrictions TEXT DEFAULT '[]',
+      search_radius INTEGER DEFAULT 10,        -- radius in miles, default 10
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
@@ -72,7 +73,14 @@ const initDb = () => {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
-
+  // Migrations — safely add new columns if they don't exist
+  const cols = db.pragma("table_info(taste_profiles)").map((c) => c.name);
+  if (!cols.includes("search_radius")) {
+    db.exec(
+      "ALTER TABLE taste_profiles ADD COLUMN search_radius INTEGER DEFAULT 10",
+    );
+    console.log("✅ Migrated: added search_radius");
+  }
   console.log("✅ Database initialized");
 };
 

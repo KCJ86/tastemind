@@ -13,8 +13,10 @@ const {
   saveVisit,
 } = require("../services/userService");
 const { getRestaurantRecommendations } = require("../services/claudeService");
-const { searchRestaurant } = require("../services/mapsService");
-
+const {
+  searchRestaurant,
+  getUserCoordinates,
+} = require("../services/mapsService");
 // POST /api/v1/recommendations
 router.post(
   "/",
@@ -33,8 +35,7 @@ router.post(
     }
 
     try {
-      const { user_code, craving, location } = req.body;
-
+      const { user_code, craving, location, radius } = req.body;
       // 1. Fetch user + their taste history
       const user = getUserByCode(user_code);
       if (!user) return res.status(404).json({ error: "User not found" });
@@ -49,10 +50,17 @@ router.post(
         location,
       );
 
-      // 3. Hit Google Places once for that recommendation
+      // 3. Geocode user location into coordinates
+      const locationStr = location || user.location;
+      const coordinates = await getUserCoordinates(locationStr);
+      console.log(`📍 Coordinates for "${locationStr}":`, coordinates);
+
+      // 4. Hit Google Places with real coordinates + radius
       const places = await searchRestaurant(
         claudeResponse.search_query,
         claudeResponse.price_range,
+        radius || 10,
+        coordinates,
       );
 
       res.json({

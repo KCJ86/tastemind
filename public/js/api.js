@@ -47,11 +47,16 @@ const api = {
   },
 
   // ── RECOMMENDATIONS ──────────────────────────────
-  getRecommendations: async (user_code, craving, location = null) => {
+  getRecommendations: async (
+    user_code,
+    craving,
+    location = null,
+    radius = 10,
+  ) => {
     const res = await fetch(`${API_BASE}/recommendations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_code, craving, location }),
+      body: JSON.stringify({ user_code, craving, location, radius }),
     });
     return res.json();
   },

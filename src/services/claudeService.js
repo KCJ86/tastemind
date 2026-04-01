@@ -64,11 +64,14 @@ Their craving right now: "${craving}"
 Based on all of this, generate exactly 1 restaurant category that best matches their craving and mood.
 Then provide a search query for Google Places to find the best options.
 
+IMPORTANT: Do NOT include any city or location name in the search_query — location is handled separately.
+Keep the search_query focused only on cuisine type, atmosphere, and food descriptors.
+
 Respond ONLY with this JSON shape:
 {
   "summary": "one sentence describing what you understood about their mood/craving",
   "category": "Italian",
-  "search_query": "cozy Italian trattoria San Diego",
+  "search_query": "cozy Italian trattoria pasta",
   "reason": "personalized reason referencing their history",
   "price_range": "$$"
 }`;

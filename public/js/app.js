@@ -7,6 +7,7 @@ const state = {
   currentUser: null,
   selectedRating: 0,
   pendingRateVisit: null,
+  searchRadius: 10,
 };
 
 // ── INIT ───────────────────────────────────────────
@@ -30,6 +31,13 @@ function bindStaticEvents() {
     .addEventListener("click", handleLoadUser);
   document.getElementById("returning-code").addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleLoadUser();
+  });
+
+  // Radius slider
+  document.getElementById("radius-slider").addEventListener("input", (e) => {
+    const val = e.target.value;
+    document.getElementById("radius-value").textContent = `${val} miles`;
+    state.searchRadius = parseInt(val);
   });
 
   // Craving input
@@ -243,6 +251,8 @@ async function handleGetRecommendations() {
     const data = await api.getRecommendations(
       state.currentUser.user_code,
       craving,
+      null,
+      state.searchRadius,
     );
 
     clearInterval(stepInterval);
