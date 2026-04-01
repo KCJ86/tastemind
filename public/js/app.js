@@ -44,9 +44,9 @@ function bindStaticEvents() {
   });
 }
 
-// ── DYNAMIC EVENT DELEGATION ───────────────────────
-// For elements rendered dynamically after page load
 document.addEventListener("click", (e) => {
+  console.log("clicked:", e.target.id, e.target.className);
+
   // Save restaurant button
   const saveBtn = e.target.closest(".card-save-btn");
   if (saveBtn && !saveBtn.disabled) {
@@ -72,7 +72,7 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Star hover
+  // Modal confirm
   const modalConfirm = e.target.closest("#modal-confirm-btn");
   if (modalConfirm) {
     handleSubmitRating();
@@ -91,7 +91,41 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Toggle user dropdown
+  // Copy user code — must be before user-pill toggle
+  if (e.target.closest("#copy-code-btn")) {
+    navigator.clipboard.writeText(state.currentUser.user_code);
+    ui.showToast("Code copied to clipboard! ✦", "gold");
+    return;
+  }
+
+  // Go home — must be before user-pill toggle
+  if (e.target.closest("#dropdown-home")) {
+    document.getElementById("user-dropdown").style.display = "none";
+    ui.showScreen("onboard");
+    return;
+  }
+
+  // Sign out — must be before user-pill toggle
+  if (e.target.closest("#dropdown-signout")) {
+    localStorage.removeItem("tm_user_code");
+    state.currentUser = null;
+    state.selectedRating = 0;
+    state.pendingRateVisit = null;
+    document.getElementById("header-right").innerHTML = `
+      <button class="nav-btn" id="signin-btn">Sign in</button>
+    `;
+    ui.showScreen("onboard");
+    ui.showToast("Signed out successfully");
+    return;
+  }
+
+  // Rate a meal nav btn
+  if (e.target.closest("#rate-btn")) {
+    handleRatePrompt();
+    return;
+  }
+
+  // Toggle user dropdown — must be after all dropdown item handlers
   if (e.target.closest("#user-pill")) {
     const dropdown = document.getElementById("user-dropdown");
     if (dropdown) {
@@ -101,45 +135,12 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Copy user code
-  if (e.target.closest("#copy-code-btn")) {
-    navigator.clipboard.writeText(state.currentUser.user_code);
-    ui.showToast("Code copied to clipboard! ✦", "gold");
-    return;
-  }
-
-  // Go home
-  if (e.target.closest("#dropdown-home")) {
-    document.getElementById("user-dropdown").style.display = "none";
-    ui.showScreen("onboard");
-    return;
-  }
-
-  // Sign out
-  if (e.target.closest("#dropdown-signout")) {
-    localStorage.removeItem("tm_user_code");
-    state.currentUser = null;
-    document.getElementById("header-right").innerHTML = `
-    <button class="nav-btn">Sign in</button>
-  `;
-    ui.showScreen("onboard");
-    ui.showToast("Signed out successfully");
-    return;
-  }
-
   // Close dropdown when clicking outside
-  if (!e.target.closest("#user-pill")) {
+  if (!e.target.closest(".user-dropdown") && !e.target.closest("#user-pill")) {
     const dropdown = document.getElementById("user-dropdown");
     if (dropdown) dropdown.style.display = "none";
   }
-
-  // Rate a meal nav btn
-  if (e.target.closest("#rate-btn")) {
-    handleRatePrompt();
-    return;
-  }
 });
-
 // Star hover effects
 document.addEventListener("mouseover", (e) => {
   const star = e.target.closest(".star");

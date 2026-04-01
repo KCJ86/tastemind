@@ -183,6 +183,9 @@ header {
   flex-direction: column;
 }
 
+#screen-app.active {
+  flex-direction: row;
+}
 /* ── ONBOARDING ───────────────────────────────────── */
 #screen-onboard {
   align-items: center;
