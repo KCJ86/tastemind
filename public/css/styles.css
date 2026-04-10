@@ -1128,3 +1128,17 @@ header {
 .distance-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
 }
+
+.vibe-header {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 20px 0 6px;
+}
+
+.vibe-reason {
+  font-size: 13px;
+  color: var(--muted2);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}

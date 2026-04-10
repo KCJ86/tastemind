@@ -1,9 +1,8 @@
 /**
  * Author: Kennedy Castillon Jimenez
  * Date: March 27th, 2026
- * Summary: This is the recommendations route that will process the recommendation actionables!
+ * Summary: Recommendations route — now returns 3 vibe-matched options in parallel.
  */
-
 const express = require("express");
 const router = express.Router();
 const { body, validationResult } = require("express-validator");
@@ -17,6 +16,7 @@ const {
   searchRestaurant,
   getUserCoordinates,
 } = require("../services/mapsService");
+
 // POST /api/v1/recommendations
 router.post(
   "/",
@@ -36,13 +36,14 @@ router.post(
 
     try {
       const { user_code, craving, location, radius } = req.body;
-      // 1. Fetch user + their taste history
+
+      // 1. Fetch user + taste history
       const user = getUserByCode(user_code);
       if (!user) return res.status(404).json({ error: "User not found" });
 
       const recentVisits = getRecentVisits(user.id, 10);
 
-      // 2. Claude generates one focused recommendation
+      // 2. Claude returns a vibe + 3 search queries
       const claudeResponse = await getRestaurantRecommendations(
         user,
         recentVisits,
@@ -50,25 +51,36 @@ router.post(
         location,
       );
 
-      // 3. Geocode user location into coordinates
+      // 3. Geocode once
       const locationStr = location || user.location;
       const coordinates = await getUserCoordinates(locationStr);
       console.log(`📍 Coordinates for "${locationStr}":`, coordinates);
 
-      // 4. Hit Google Places with real coordinates + radius
-      const places = await searchRestaurant(
-        claudeResponse.search_query,
-        claudeResponse.price_range,
-        radius || 10,
-        coordinates,
+      // 4. Run all 3 Places searches in parallel, grab top result from each
+      const options = await Promise.all(
+        claudeResponse.options.map(async (option) => {
+          const places = await searchRestaurant(
+            option.search_query,
+            claudeResponse.price_range,
+            radius || 10,
+            coordinates,
+          );
+          return {
+            label: option.label,
+            place: places[0] || null,
+          };
+        }),
       );
+
+      // 5. Filter out any options where no place was found
+      const validOptions = options.filter((o) => o.place !== null);
 
       res.json({
         success: true,
         summary: claudeResponse.summary,
-        category: claudeResponse.category,
+        vibe: claudeResponse.vibe,
         reason: claudeResponse.reason,
-        places,
+        options: validOptions,
       });
     } catch (err) {
       console.error(err);
@@ -77,7 +89,7 @@ router.post(
   },
 );
 
-// POST /api/v1/recommendations/save — save a visit when user picks a restaurant
+// POST /api/v1/recommendations/save
 router.post(
   "/save",
   [
@@ -99,7 +111,6 @@ router.post(
       if (!user) return res.status(404).json({ error: "User not found" });
 
       const visit = saveVisit(user.id, req.body);
-
       res.status(201).json({
         success: true,
         visit_id: visit.lastInsertRowid,

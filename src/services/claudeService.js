@@ -1,13 +1,9 @@
 /**
- *
  * Author: Kennedy Castillon Jimenez
  * Date: March 27th, 2026
  * Summary: The main portion of our claude service to process and build the prompts for response.
- *
  */
-
 const Anthropic = require("@anthropic-ai/sdk");
-
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const buildTasteContext = (user, recentVisits) => {
@@ -42,9 +38,9 @@ const getRestaurantRecommendations = async (
     recentVisits,
   );
 
-  const systemPrompt = `You are TasteMind, a personal AI dining concierge. 
+  const systemPrompt = `You are TasteMind, a personal AI dining concierge.
 Your job is to recommend restaurants based on a user's mood, taste history, and preferences.
-You are thoughtful, personalized, and always explain WHY you're recommending each place.
+You think in vibes and experiences, not just cuisine labels.
 Always respond with valid JSON only — no markdown, no preamble, no explanation outside the JSON.`;
 
   const userPrompt = `Here is everything you know about this user:
@@ -61,19 +57,36 @@ ${visitHistory}
 
 Their craving right now: "${craving}"
 
-Based on all of this, generate exactly 1 restaurant category that best matches their craving and mood.
-Then provide a search query for Google Places to find the best options.
+Based on all of this, identify ONE dining vibe or experience that best matches their craving and mood.
+Then generate exactly 3 different restaurant search queries that each express that vibe in a different way —
+different cuisines, different styles, or different takes on the same feeling.
 
-IMPORTANT: Do NOT include any city or location name in the search_query — location is handled separately.
-Keep the search_query focused only on cuisine type, atmosphere, and food descriptors.
+The 3 options should feel meaningfully different from each other, not just the same cuisine with different words.
+Think: if someone wants "warm and comforting soup", options might be pho, ramen, and pozole — same vibe, different worlds.
+
+IMPORTANT: Do NOT include any city or location name in any search_query — location is handled separately.
+Keep each search_query focused only on cuisine type, atmosphere, and food descriptors.
 
 Respond ONLY with this JSON shape:
 {
   "summary": "one sentence describing what you understood about their mood/craving",
-  "category": "Italian",
-  "search_query": "cozy Italian trattoria pasta",
-  "reason": "personalized reason referencing their history",
-  "price_range": "$$"
+  "vibe": "Warm & Comforting",
+  "reason": "personalized reason referencing their history and why this vibe fits",
+  "price_range": "$$",
+  "options": [
+    {
+      "label": "Vietnamese Pho",
+      "search_query": "Vietnamese pho rich broth noodles"
+    },
+    {
+      "label": "Japanese Ramen",
+      "search_query": "Japanese ramen tonkotsu cozy"
+    },
+    {
+      "label": "Mexican Pozole",
+      "search_query": "Mexican pozole hominy soup comfort food"
+    }
+  ]
 }`;
 
   const message = await client.messages.create({
@@ -84,7 +97,6 @@ Respond ONLY with this JSON shape:
   });
 
   const raw = message.content[0].text.trim();
-
   try {
     return JSON.parse(raw);
   } catch {

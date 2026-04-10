@@ -182,27 +182,30 @@ const ui = {
 
   // ── RECOMMENDATIONS ───────────────────────────────
   renderRecommendations: (data, onSave) => {
-    const cards =
-      data.places.length > 0
-        ? data.places
-            .map((p) => ui.restaurantCard(p, data.category, onSave))
-            .join("")
-        : `<div style="font-size:13px;color:var(--muted2);font-style:italic;padding:16px 0">
-         No places found nearby — try a different search
-       </div>`;
+    const groups = data.options
+      .map((option) => {
+        if (!option.place) return "";
+        return `
+        <div class="rec-group">
+          <div class="rec-group-header">
+            <div class="rec-cuisine">${option.label}</div>
+          </div>
+          <div class="cards-row">
+            ${ui.restaurantCard(option.place, option.label, onSave)}
+          </div>
+        </div>
+      `;
+      })
+      .join("");
 
     document.getElementById("main-content").innerHTML = `
     <div class="ai-banner">
       <div class="ai-icon">✦ AI</div>
       <div class="ai-summary">${data.summary}</div>
     </div>
-    <div class="rec-group">
-      <div class="rec-group-header">
-        <div class="rec-cuisine">${data.category}</div>
-      </div>
-      <div class="rec-reason">${data.reason}</div>
-      <div class="cards-row">${cards}</div>
-    </div>
+    <div class="vibe-header">${data.vibe}</div>
+    <div class="vibe-reason">${data.reason}</div>
+    ${groups}
   `;
   },
 
