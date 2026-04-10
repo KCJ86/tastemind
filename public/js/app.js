@@ -306,9 +306,9 @@ async function handleSaveVisit(restaurant, btn) {
 // ── RATING ─────────────────────────────────────────
 function openRatingModal(visit_id, name) {
   state.selectedRating = 0;
+  state.pendingRateVisit = { visit_id, name };
   ui.renderRatingModal(visit_id, name);
 }
-
 async function handleSubmitRating() {
   if (!state.selectedRating) return;
 

@@ -39,7 +39,7 @@ const aiLimiter = rateLimit({
   max: 10,
   message: { error: "AI recommendation limit reached, wait a moment." },
 });
-app.use("/api/v1/recommend", aiLimiter);
+app.use("/api/v1/recommendations", aiLimiter);
 
 // ─── General Middleware ────────────────────────────────
 app.use(morgan("dev")); // request logging
