@@ -6,6 +6,7 @@
 
 const { db } = require("../db/database");
 const crypto = require("crypto");
+const DAILY_RECOMMENDATION_LIMIT = 10;
 
 // Generate a simple unique user code like: "kennedy_cd64"
 const generateUserCode = (name) => {
@@ -34,6 +35,30 @@ const createUser = (name, location) => {
   ).run(user.lastInsertRowid);
 
   return getUserById(user.lastInsertRowid);
+};
+
+const getDailyRecommendationCount = (user_id) => {
+  return db
+    .prepare(
+      `
+    SELECT COUNT(*) as count
+    FROM recommendation_logs
+    WHERE user_id = ?
+    AND created_at > datetime('now', '-1 day')
+  `,
+    )
+    .get(user_id).count;
+};
+
+const logRecommendation = (user_id) => {
+  return db
+    .prepare(
+      `
+    INSERT INTO recommendation_logs (user_id)
+    VALUES (?)
+  `,
+    )
+    .run(user_id);
 };
 
 const getUserById = (id) => {
@@ -141,4 +166,7 @@ module.exports = {
   getRecentVisits,
   saveVisit,
   saveRating,
+  getDailyRecommendationCount,
+  logRecommendation,
+  DAILY_RECOMMENDATION_LIMIT,
 };

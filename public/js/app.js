@@ -325,6 +325,12 @@ async function handleGetRecommendations() {
       state.searchRadius,
     );
     clearInterval(stepInterval);
+
+    if (data.limit_reached) {
+      ui.renderLimitReached();
+      return;
+    }
+
     if (!data.success) throw new Error();
     ui.renderRecommendations(data, handleSaveVisit);
   } catch {

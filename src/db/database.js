@@ -57,7 +57,7 @@ const initDb = () => {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
-    -- Reservations tied to Stripe
+    -- Reservations tied to Stripe (later to do as scaling)
     CREATE TABLE IF NOT EXISTS reservations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -72,6 +72,14 @@ const initDb = () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    -- User limitation table 
+    CREATE TABLE IF NOT EXISTS recommendation_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+      );
   `);
   // Migrations — safely add new columns if they don't exist
   const cols = db.pragma("table_info(taste_profiles)").map((c) => c.name);

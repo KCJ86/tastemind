@@ -10,6 +10,9 @@ const {
   getUserByCode,
   getRecentVisits,
   saveVisit,
+  getDailyRecommendationCount,
+  logRecommendation,
+  DAILY_RECOMMENDATION_LIMIT,
 } = require("../services/userService");
 const { getRestaurantRecommendations } = require("../services/claudeService");
 const {
@@ -41,6 +44,15 @@ router.post(
       const user = getUserByCode(user_code);
       if (!user) return res.status(404).json({ error: "User not found" });
 
+      // Check daily recommendation limit
+      const dailyCount = getDailyRecommendationCount(user.id);
+      if (dailyCount >= DAILY_RECOMMENDATION_LIMIT) {
+        return res.status(429).json({
+          error: `Daily recommendation limit reached (${DAILY_RECOMMENDATION_LIMIT}/day). Come back tomorrow!`,
+          limit_reached: true,
+        });
+      }
+
       const recentVisits = getRecentVisits(user.id, 10);
 
       // 2. Claude returns a vibe + 3 search queries
@@ -50,6 +62,9 @@ router.post(
         craving,
         location,
       );
+
+      // Log this recommendation against the user's daily count
+      logRecommendation(user.id);
 
       // 3. Geocode once
       const locationStr = location || user.location;

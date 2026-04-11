@@ -184,7 +184,29 @@ const ui = {
     `;
   },
 
-  // ── RECOMMENDATIONS ───────────────────────────────
+  // ── Limiter ────────────────────────
+  renderLimitReached: () => {
+    document.getElementById("main-content").innerHTML = `
+    <div class="limit-wrap">
+      <div class="limit-glyph">🍽️</div>
+      <div class="limit-title">You've been busy dining!</div>
+      <div class="limit-sub">
+        You've hit your daily recommendation limit. TasteMind will be back
+        with fresh picks tomorrow — great taste takes time.
+      </div>
+      <div class="limit-pills">
+        <div class="limit-pill"><span class="limit-pill-icon">✦</span> 10 of 10 used</div>
+        <div class="limit-pill"><span class="limit-pill-icon">🕐</span> Resets at midnight</div>
+      </div>
+      <div class="limit-bar-wrap">
+        <div class="limit-bar"></div>
+      </div>
+      <div class="limit-reset">Come back tomorrow for more recommendations</div>
+    </div>
+  `;
+  },
+
+  // ── RECOMMENDATIONS ───────
   renderRecommendations: (data, onSave) => {
     const groups = data.options
       .map((option) => {

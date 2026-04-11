@@ -475,7 +475,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: opacity 0.2s;
@@ -1250,4 +1250,109 @@ header {
 
 .sidebar-pending-section {
   border-bottom: none;
+}
+
+/* ── Limit reached screen ─────────────────────────── */
+@keyframes limitFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes limitFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.limit-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 32px;
+  min-height: 400px;
+}
+
+.limit-glyph {
+  font-size: 52px;
+  animation: limitFloat 3s ease-in-out infinite;
+  margin-bottom: 24px;
+  line-height: 1;
+}
+
+.limit-title {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 28px;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text);
+  margin-bottom: 12px;
+  animation: limitFadeIn 0.5s ease both 0.1s;
+}
+
+.limit-sub {
+  font-size: 14px;
+  color: var(--muted2);
+  line-height: 1.7;
+  max-width: 320px;
+  margin: 0 auto 32px;
+  animation: limitFadeIn 0.5s ease both 0.2s;
+}
+
+.limit-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 24px;
+  animation: limitFadeIn 0.5s ease both 0.3s;
+}
+
+.limit-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--muted2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.limit-pill-icon {
+  font-size: 14px;
+}
+
+.limit-bar-wrap {
+  width: 200px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+  overflow: hidden;
+  animation: limitFadeIn 0.5s ease both 0.35s;
+}
+
+.limit-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--gold);
+  border-radius: 2px;
+}
+
+.limit-reset {
+  font-size: 12px;
+  color: var(--muted2);
+  animation: limitFadeIn 0.5s ease both 0.4s;
 }
