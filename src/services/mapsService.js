@@ -67,6 +67,21 @@ const searchRestaurant = async (
   }
 };
 
+const getResolvedLocationName = async (locationStr) => {
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locationStr)}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status === "OK" && data.results.length > 0) {
+      return data.results[0].formatted_address;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 const getRestaurantDetails = async (place_id) => {
   try {
     const { data } = await axios.get(DETAILS_URL, {
@@ -106,4 +121,9 @@ const getUserCoordinates = async (location) => {
   }
 };
 
-module.exports = { searchRestaurant, getRestaurantDetails, getUserCoordinates };
+module.exports = {
+  searchRestaurant,
+  getRestaurantDetails,
+  getUserCoordinates,
+  getResolvedLocationName,
+};

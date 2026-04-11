@@ -171,6 +171,96 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// ── LOCATION EDITING ───────────────────────────────
+function initLocation() {
+  const user = state.currentUser;
+  ui.renderLocation(user.location);
+
+  document
+    .getElementById("location-edit-btn")
+    ?.addEventListener("click", () => {
+      document.getElementById("location-display").style.display = "none";
+      document.getElementById("location-edit").style.display = "block";
+      const input = document.getElementById("location-input");
+      input.value = user.location || "";
+      input.focus();
+    });
+
+  document
+    .getElementById("location-cancel-btn")
+    ?.addEventListener("click", () => {
+      closeLocationEdit();
+    });
+
+  document
+    .getElementById("location-save-btn")
+    ?.addEventListener("click", () => {
+      handleSaveLocation();
+    });
+
+  document
+    .getElementById("location-input")
+    ?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleSaveLocation();
+      if (e.key === "Escape") closeLocationEdit();
+    });
+}
+
+function closeLocationEdit() {
+  document.getElementById("location-display").style.display = "flex";
+  document.getElementById("location-edit").style.display = "none";
+  document.getElementById("location-resolved").style.display = "none";
+  document.getElementById("location-resolved").textContent = "";
+}
+
+async function handleSaveLocation() {
+  const input = document.getElementById("location-input").value.trim();
+  if (!input) return;
+
+  const btn = document.getElementById("location-save-btn");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+
+  try {
+    const data = await api.updateLocation(state.currentUser.user_code, input);
+
+    if (data.invalid) {
+      // Show error — location not found
+      const resolved = document.getElementById("location-resolved");
+      resolved.style.display = "block";
+      resolved.className = "location-resolved error";
+      resolved.textContent = data.error;
+      btn.disabled = false;
+      btn.textContent = "Confirm location →";
+      return;
+    }
+
+    if (!data.success) throw new Error();
+
+    // Show resolved address for confirmation
+    const resolved = document.getElementById("location-resolved");
+    resolved.style.display = "block";
+    resolved.className = "location-resolved success";
+    resolved.textContent = `✓ Found: ${data.location}`;
+
+    // Update state + UI
+    state.currentUser.location = data.location;
+    ui.renderLocation(data.location);
+
+    // Update dropdown location label
+    const dropdownLocation = document.querySelector(".dropdown-location");
+    if (dropdownLocation) dropdownLocation.textContent = `📍 ${data.location}`;
+
+    ui.showToast("Location updated! ✦", "gold");
+
+    setTimeout(() => closeLocationEdit(), 1500);
+  } catch {
+    ui.showToast("Could not update location");
+    btn.disabled = false;
+    btn.textContent = "Confirm location →";
+  }
+}
+
 // ── STAR HOVER ─────────────────────────────────────
 document.addEventListener("mouseover", (e) => {
   const star = e.target.closest(".star:not(.review-star)");
@@ -245,6 +335,7 @@ function enterApp() {
     ui.renderHeader(state.currentUser, visits ? visits.length : 0);
     ui.renderTasteTags(state.currentUser);
     renderSidebar();
+    initLocation();
   });
 }
 

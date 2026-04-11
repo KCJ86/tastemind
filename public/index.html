@@ -71,6 +71,38 @@
       <!-- SIDEBAR -->
       <aside class="sidebar">
         <div class="sidebar-top">
+          <!-- Location bar — lives inside sidebar-top -->
+          <div class="location-bar" id="location-bar">
+            <div class="location-display" id="location-display">
+              <span class="location-icon">📍</span>
+              <span class="location-text" id="location-text">Loading…</span>
+              <button class="location-edit-btn" id="location-edit-btn">
+                Edit
+              </button>
+            </div>
+            <div class="location-edit" id="location-edit" style="display: none">
+              <input
+                class="fancy-input"
+                type="text"
+                id="location-input"
+                placeholder="e.g. Springfield, IL or Chicago, IL"
+              />
+              <div
+                class="location-resolved"
+                id="location-resolved"
+                style="display: none"
+              ></div>
+              <div class="location-actions">
+                <button class="ghost-btn" id="location-cancel-btn">
+                  Cancel
+                </button>
+                <button class="ask-btn" id="location-save-btn">
+                  Confirm location →
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="sidebar-label">What are you craving?</div>
           <textarea
             class="craving-area"
@@ -131,7 +163,6 @@
         <div class="sidebar-label sidebar-section-label">History</div>
         <div id="history-list"></div>
       </aside>
-      <!-- ← this was missing! -->
 
       <!-- MAIN CONTENT -->
       <main class="main-content" id="main-content">

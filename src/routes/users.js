@@ -7,7 +7,10 @@
 const express = require("express");
 const router = express.Router();
 const { body, validationResult } = require("express-validator");
-
+const {
+  getUserCoordinates,
+  getResolvedLocationName,
+} = require("../services/mapsService");
 const {
   createUser,
   getUserByCode,
@@ -15,6 +18,7 @@ const {
   getRecentVisits,
   saveRating,
 } = require("../services/userService");
+const { db } = require("../db/database");
 
 // POST /api/v1/users — create a new user
 router.post(
@@ -125,5 +129,46 @@ router.post(
     }
   },
 );
+
+// PATCH /api/v1/users/:code/location — validate + save location
+router.patch("/:code/location", async (req, res) => {
+  const { location } = req.body;
+  if (!location || !location.trim()) {
+    return res.status(400).json({ error: "Location is required" });
+  }
+
+  try {
+    const user = getUserByCode(req.params.code);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Validate against Google Geocoding
+    const coordinates = await getUserCoordinates(location.trim());
+    if (!coordinates) {
+      return res.status(400).json({
+        error:
+          "Could not find that location. Try being more specific, e.g. 'Springfield, IL'",
+        invalid: true,
+      });
+    }
+
+    // Get the resolved display name from geocoding
+    const resolvedName = await getResolvedLocationName(location.trim());
+
+    // Save to DB
+    db.prepare("UPDATE users SET location = ? WHERE user_code = ?").run(
+      resolvedName || location.trim(),
+      req.params.code,
+    );
+
+    res.json({
+      success: true,
+      location: resolvedName || location.trim(),
+      coordinates,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not update location" });
+  }
+});
 
 module.exports = router;

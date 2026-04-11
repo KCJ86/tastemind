@@ -54,47 +54,45 @@ const ui = {
       .toUpperCase();
 
     const liked = JSON.parse(user.liked_cuisines || "[]");
-
     document.getElementById("header-right").innerHTML = `
-    <div class="user-pill" id="user-pill">
-      <div class="user-avatar">${initials}</div>
-      ${user.name}
-      <div class="user-dropdown" id="user-dropdown" style="display:none">
+      <div class="user-pill" id="user-pill">
+        <div class="user-avatar">${initials}</div>
+        ${user.name}
+        <div class="user-dropdown" id="user-dropdown" style="display:none">
 
-        <div class="dropdown-header">
-          <div class="dropdown-name">${user.name}</div>
-          <div class="dropdown-location">📍 ${user.location || "No location set"}</div>
-          <div class="dropdown-code" id="copy-code-btn">
-            <div>
-              <div class="dropdown-code-label">Your return code</div>
-              <div class="dropdown-code-value">${user.user_code}</div>
+          <div class="dropdown-header">
+            <div class="dropdown-name">${user.name}</div>
+            <div class="dropdown-location">📍 ${user.location || "No location set"}</div>
+            <div class="dropdown-code" id="copy-code-btn">
+              <div>
+                <div class="dropdown-code-label">Your return code</div>
+                <div class="dropdown-code-value">${user.user_code}</div>
+              </div>
+              <div class="dropdown-copy">copy</div>
             </div>
-            <div class="dropdown-copy">copy</div>
           </div>
-        </div>
 
-        <div class="dropdown-stats">
-          <div class="dropdown-stat">
-            <div class="dropdown-stat-value">${visitCount}</div>
-            <div class="dropdown-stat-label">Visits</div>
+          <div class="dropdown-stats">
+            <div class="dropdown-stat">
+              <div class="dropdown-stat-value">${visitCount}</div>
+              <div class="dropdown-stat-label">Visits</div>
+            </div>
+            <div class="dropdown-stat">
+              <div class="dropdown-stat-value">${liked.length}</div>
+              <div class="dropdown-stat-label">Cuisines</div>
+            </div>
           </div>
-          <div class="dropdown-stat">
-            <div class="dropdown-stat-value">${liked.length}</div>
-            <div class="dropdown-stat-label">Cuisines</div>
+
+          <div class="dropdown-item" id="dropdown-home">
+            <span class="dropdown-icon">🏠</span> Go to home
           </div>
-        </div>
+          <div class="dropdown-item danger" id="dropdown-signout">
+            <span class="dropdown-icon">→</span> Sign out
+          </div>
 
-        <div class="dropdown-item" id="dropdown-home">
-          <span class="dropdown-icon">🏠</span> Go to home
         </div>
-        <div class="dropdown-item danger" id="dropdown-signout">
-          <span class="dropdown-icon">→</span> Sign out
-        </div>
-
       </div>
-    </div>
-    <button class="nav-btn" id="rate-btn">Rate a meal</button>
-  `;
+    `;
   },
 
   // ── TASTE TAGS ────────────────────────────────────
@@ -137,6 +135,70 @@ const ui = {
       .join("");
   },
 
+  // ── SIDEBAR TABS ──────────────────────────────────
+  renderPendingList: (pending) => {
+    const list = document.getElementById("history-list");
+    if (!pending || pending.length === 0) {
+      list.innerHTML = '<div class="empty-history">No pending visits</div>';
+      return;
+    }
+    list.innerHTML = pending
+      .map(
+        (r) => `
+        <div class="pending-item history-item" data-place-id="${r.place_id}">
+          <div>
+            <div class="history-name">${r.restaurant_name}</div>
+            <div class="history-meta">${r.cuisine_type || "Restaurant"} · Tap to review</div>
+          </div>
+          <div class="pending-dot">●</div>
+        </div>
+      `,
+      )
+      .join("");
+  },
+
+  // ── REVIEW SLIP ───────────────────────────────────
+  renderReviewSlip: (restaurant) => {
+    document.getElementById("main-content").innerHTML = `
+      <div class="review-slip">
+        <div class="review-slip-eyebrow">Pending feedback</div>
+        <div class="review-slip-name">${restaurant.restaurant_name}</div>
+        <div class="review-slip-meta">${restaurant.cuisine_type || ""} ${restaurant.address ? "· " + restaurant.address : ""}</div>
+
+        <div class="review-section-label">How was your meal?</div>
+        <div class="star-row" id="review-star-row">
+          ${[1, 2, 3, 4, 5]
+            .map(
+              (n) =>
+                `<span class="star review-star" data-value="${n}">★</span>`,
+            )
+            .join("")}
+        </div>
+
+        <textarea
+          class="fancy-input"
+          id="review-notes"
+          placeholder="Any notes? e.g. 'broth was incredible, a bit loud though'"
+          rows="3"
+          style="margin-top: 12px"
+        ></textarea>
+
+        <div class="review-actions">
+          <button class="modal-cancel" id="review-cancel-btn">Cancel</button>
+          <button class="modal-confirm" id="review-submit-btn" disabled>
+            Submit review →
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
+  // ── REVIEW STAR UPDATES ───────────────────────────
+  updateReviewStars: (n) => {
+    document.querySelectorAll(".review-star").forEach((s, i) => {
+      s.classList.toggle("active", i < n);
+    });
+  },
   // ── LOADING STATE ─────────────────────────────────
   renderLoading: () => {
     document.getElementById("main-content").innerHTML = `
@@ -317,6 +379,12 @@ const ui = {
   },
 
   // ── SIDEBAR TABS ──────────────────────────────────
+
+  renderLocation: (location) => {
+    const text = document.getElementById("location-text");
+    if (text) text.textContent = location || "No location set";
+  },
+
   renderPendingList: (pending) => {
     const list = document.getElementById("pending-list");
     if (!list) return;

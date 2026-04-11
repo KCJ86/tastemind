@@ -72,4 +72,13 @@ const api = {
     });
     return res.json();
   },
+
+  updateLocation: async (user_code, location) => {
+    const res = await fetch(`${API_BASE}/users/${user_code}/location`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location }),
+    });
+    return res.json();
+  },
 };

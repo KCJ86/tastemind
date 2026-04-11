@@ -1356,3 +1356,51 @@ header {
   color: var(--muted2);
   animation: limitFadeIn 0.5s ease both 0.4s;
 }
+/* ── Location bar ─────────────────────────────────── */
+.location-bar {
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.location-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.location-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.location-text {
+  font-size: 12px;
+  color: var(--muted2);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+
+.location-edit-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted2);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.location-edit-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
