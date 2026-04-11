@@ -35,7 +35,7 @@ The more you use it, the smarter it gets. Rate a meal 4+ stars and TasteMind aut
 | Backend  | Node.js + Express                             |
 | AI       | Anthropic Claude (`claude-sonnet-4-20250514`) |
 | Maps     | Google Places API (New) + Geocoding API       |
-| Database | SQLite via `better-sqlite3`                   |
+| Database | PostgreSQL (Railway managed)                  |
 | Frontend | Vanilla HTML, CSS, JavaScript                 |
 | Security | Helmet, express-rate-limit, input validation  |
 | Hosting  | Railway                                       |
@@ -60,6 +60,7 @@ The more you use it, the smarter it gets. Rate a meal 4+ stars and TasteMind aut
 ### Prerequisites
 
 - Node.js 18+
+- A PostgreSQL database — [Railway](https://railway.app) offers a free managed instance
 - An Anthropic API key — [console.anthropic.com](https://console.anthropic.com)
 - A Google Maps API key with **Places API (New)** and **Geocoding API** enabled — [console.cloud.google.com](https://console.cloud.google.com)
 
@@ -82,10 +83,13 @@ Open `.env` and fill in your keys:
 ```env
 ANTHROPIC_API_KEY=your_anthropic_key_here
 GOOGLE_MAPS_API_KEY=your_google_maps_key_here
+DATABASE_URL=postgresql://postgres:password@host:port/railway
 PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
 ```
+
+> **Tip:** If using Railway PostgreSQL, use the `DATABASE_PUBLIC_URL` from your PostgreSQL service variables as your local `DATABASE_URL` — it works from outside Railway's network.
 
 ```bash
 # Start the dev server
@@ -95,6 +99,19 @@ npm run dev
 Visit `http://localhost:3000` — the app is ready.
 
 ---
+
+## Architecture
+
+Browser
+│
+▼
+Railway (Express + Node.js)
+│
+├──▶ Anthropic Claude API (vibe + search query generation)
+│
+├──▶ Google Places API (real restaurant results)
+│
+└──▶ PostgreSQL (Railway) (users, visits, ratings, taste profiles)
 
 ## API Endpoints
 
@@ -125,9 +142,9 @@ tastemind/
 ├── src/
 │ ├── index.js # Express app + middleware
 │ ├── db/
-│ │ └── database.js # SQLite setup + migrations
+│ │ └── database.js # PostgreSQL pool + migrations
 │ ├── routes/
-│ │ ├── users.js # User CRUD + taste + ratings
+│ │ ├── users.js # User CRUD + taste + ratings + location
 │ │ └── recommendations.js # Claude + Places integration
 │ └── services/
 │ ├── claudeService.js # NL → structured recommendation
@@ -160,10 +177,9 @@ tastemind/
 
 **Kennedy Castillon Jimenez**
 
-Built as a portfolio project demonstrating full-stack AI integration with Claude, real-time location APIs, and a feedback-driven personalization loop.
-
+Built as a portfolio project demonstrating full-stack AI integration with Claude, real-time location APIs, PostgreSQL persistence, and a feedback-driven personalization loop.
 Shoot me a message and let me know what would be dope to add! `:)`
 
 ---
 
-_TasteMind — because "I don't know, what do you want?" is not a valid answer._
+_TasteMind — because "I don't know, what do you want?" is not a valid answer._.

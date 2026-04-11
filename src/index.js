@@ -1,7 +1,4 @@
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
-
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -11,16 +8,12 @@ const path = require("path");
 const { initDb } = require("./db/database");
 
 const app = express();
-app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
-// ─── Security Middleware ───────────────────────────────
-app.use(
-  helmet({
-    contentSecurityPolicy: false, // we'll tighten this later
-  }),
-);
+app.set("trust proxy", 1);
 
+// ─── Security Middleware ───────────────────────────────
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -29,7 +22,6 @@ app.use(
   }),
 );
 
-// Rate limiting — 100 requests per 15 min per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -37,39 +29,41 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
-// Stricter limit on the AI endpoint specifically
 const aiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: 10,
   message: { error: "AI recommendation limit reached, wait a moment." },
 });
 app.use("/api/v1/recommendations", aiLimiter);
 
 // ─── General Middleware ────────────────────────────────
-app.use(morgan("dev")); // request logging
-app.use(express.json()); // parse JSON bodies
-app.use(express.static(path.join(__dirname, "../public"))); // serve frontend
+app.use(morgan("dev"));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
 
-// ─── Routes (we'll add these next) ────────────────────
+// ─── Routes ───────────────────────────────────────────
 app.use("/api/v1/users", require("./routes/users"));
 app.use("/api/v1/recommendations", require("./routes/recommendations"));
-// app.use('/api/v1/visits', require('./routes/visits'));
-// app.use('/api/v1/reservations', require('./routes/reservations'));
-// app.use('/api/v1/webhooks', require('./routes/webhooks'));
 
 // ─── Global Error Handler ──────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err.stack); // log full error server-side
+  console.error(err.stack);
   res.status(err.status || 500).json({
     error:
       process.env.NODE_ENV === "production"
         ? "Something went wrong"
-        : err.message, // show details in dev only
+        : err.message,
   });
 });
 
 // ─── Start ────────────────────────────────────────────
-initDb();
-app.listen(PORT, () => {
-  console.log(`🍽️  TasteMind running on http://localhost:${PORT}`);
-});
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🍽️  TasteMind running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to initialize database:", err);
+    process.exit(1);
+  });
