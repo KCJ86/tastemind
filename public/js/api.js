@@ -2,7 +2,10 @@
 // All backend communication lives here.
 // No DOM manipulation, no state — just fetch calls.
 
-const API_BASE = "http://localhost:3000/api/v1";
+const API_BASE =
+  window.location.hostname === "localhost"
+    ? "http://localhost:3000/api/v1"
+    : `${window.location.origin}/api/v1`;
 
 const api = {
   // ── USERS ────────────────────────────────────────
