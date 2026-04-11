@@ -1,6 +1,5 @@
 // ── APP LAYER ──────────────────────────────────────
 // Main state, event handlers, and orchestration.
-// Connects api.js and ui.js together.
 
 // ── STATE ──────────────────────────────────────────
 const state = {
@@ -13,16 +12,12 @@ const state = {
 // ── INIT ───────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
   bindStaticEvents();
-
-  // Auto-login if user code saved in localStorage
   const savedCode = localStorage.getItem("tm_user_code");
   if (savedCode) fetchAndEnterApp(savedCode);
 });
 
 // ── STATIC EVENT BINDINGS ──────────────────────────
-// Only for elements that exist on page load
 function bindStaticEvents() {
-  // Onboarding
   document
     .getElementById("create-user-btn")
     .addEventListener("click", handleCreateUser);
@@ -32,15 +27,11 @@ function bindStaticEvents() {
   document.getElementById("returning-code").addEventListener("keydown", (e) => {
     if (e.key === "Enter") handleLoadUser();
   });
-
-  // Radius slider
   document.getElementById("radius-slider").addEventListener("input", (e) => {
     const val = e.target.value;
     document.getElementById("radius-value").textContent = `${val} miles`;
     state.searchRadius = parseInt(val);
   });
-
-  // Craving input
   document
     .getElementById("ask-btn")
     .addEventListener("click", handleGetRecommendations);
@@ -52,27 +43,57 @@ function bindStaticEvents() {
   });
 }
 
+// ── DELEGATED CLICK HANDLER ────────────────────────
 document.addEventListener("click", (e) => {
   console.log("clicked:", e.target.id, e.target.className);
 
   // Save restaurant button
   const saveBtn = e.target.closest(".card-save-btn");
   if (saveBtn && !saveBtn.disabled) {
-    const data = JSON.parse(decodeURIComponent(saveBtn.dataset.restaurant));
-    handleSaveVisit(data, saveBtn);
+    const placeId = saveBtn.dataset.placeId;
+    const data = restaurantStore.get(placeId);
+    if (data) handleSaveVisit(data, saveBtn);
     return;
   }
 
-  // History item — open rate modal
-  const historyItem = e.target.closest(".history-item");
+  // Pending list item — open review slip
+  const pendingItem = e.target.closest(".pending-item");
+  if (pendingItem) {
+    openReviewSlip(pendingItem.dataset.placeId);
+    return;
+  }
+
+  // History item — open rating modal
+  const historyItem = e.target.closest(".history-item:not(.pending-item)");
   if (historyItem) {
     const { visitId, visitName } = historyItem.dataset;
     openRatingModal(parseInt(visitId), visitName);
     return;
   }
 
-  // Star rating
-  const star = e.target.closest(".star");
+  // Review slip star
+  const reviewStar = e.target.closest(".review-star");
+  if (reviewStar) {
+    state.selectedRating = parseInt(reviewStar.dataset.value);
+    ui.updateReviewStars(state.selectedRating);
+    document.getElementById("review-submit-btn").disabled = false;
+    return;
+  }
+
+  // Review slip submit
+  if (e.target.closest("#review-submit-btn")) {
+    handleSubmitReview();
+    return;
+  }
+
+  // Review slip cancel
+  if (e.target.closest("#review-cancel-btn")) {
+    ui.renderEmpty();
+    return;
+  }
+
+  // Modal star rating
+  const star = e.target.closest(".star:not(.review-star)");
   if (star) {
     state.selectedRating = parseInt(star.dataset.value);
     ui.updateStars(state.selectedRating);
@@ -81,8 +102,7 @@ document.addEventListener("click", (e) => {
   }
 
   // Modal confirm
-  const modalConfirm = e.target.closest("#modal-confirm-btn");
-  if (modalConfirm) {
+  if (e.target.closest("#modal-confirm-btn")) {
     handleSubmitRating();
     return;
   }
@@ -99,21 +119,22 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Copy user code — must be before user-pill toggle
+  // Copy user code
   if (e.target.closest("#copy-code-btn")) {
     navigator.clipboard.writeText(state.currentUser.user_code);
     ui.showToast("Code copied to clipboard! ✦", "gold");
     return;
   }
 
-  // Go home — must be before user-pill toggle
+  // Go home
   if (e.target.closest("#dropdown-home")) {
-    document.getElementById("user-dropdown").style.display = "none";
+    const dd = document.getElementById("user-dropdown");
+    if (dd) dd.style.display = "none";
     ui.showScreen("onboard");
     return;
   }
 
-  // Sign out — must be before user-pill toggle
+  // Sign out
   if (e.target.closest("#dropdown-signout")) {
     localStorage.removeItem("tm_user_code");
     state.currentUser = null;
@@ -133,7 +154,7 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Toggle user dropdown — must be after all dropdown item handlers
+  // Toggle user dropdown
   if (e.target.closest("#user-pill")) {
     const dropdown = document.getElementById("user-dropdown");
     if (dropdown) {
@@ -149,15 +170,22 @@ document.addEventListener("click", (e) => {
     if (dropdown) dropdown.style.display = "none";
   }
 });
-// Star hover effects
+
+// ── STAR HOVER ─────────────────────────────────────
 document.addEventListener("mouseover", (e) => {
-  const star = e.target.closest(".star");
+  const star = e.target.closest(".star:not(.review-star)");
   if (star) ui.updateStars(parseInt(star.dataset.value));
+
+  const reviewStar = e.target.closest(".review-star");
+  if (reviewStar) ui.updateReviewStars(parseInt(reviewStar.dataset.value));
 });
 
 document.addEventListener("mouseout", (e) => {
-  const star = e.target.closest(".star");
+  const star = e.target.closest(".star:not(.review-star)");
   if (star) ui.updateStars(state.selectedRating);
+
+  const reviewStar = e.target.closest(".review-star");
+  if (reviewStar) ui.updateReviewStars(state.selectedRating);
 });
 
 // ── USER HANDLERS ──────────────────────────────────
@@ -177,7 +205,6 @@ async function handleCreateUser() {
   try {
     const data = await api.createUser(name, location);
     if (!data.success) throw new Error();
-
     state.currentUser = data.user;
     localStorage.setItem("tm_user_code", data.user.user_code);
     enterApp();
@@ -203,7 +230,6 @@ async function fetchAndEnterApp(code) {
   try {
     const data = await api.getUser(code);
     if (!data.success) throw new Error();
-
     state.currentUser = data.user;
     localStorage.setItem("tm_user_code", code);
     enterApp();
@@ -218,7 +244,50 @@ function enterApp() {
   refreshHistory().then((visits) => {
     ui.renderHeader(state.currentUser, visits ? visits.length : 0);
     ui.renderTasteTags(state.currentUser);
+    renderSidebar();
   });
+}
+
+// ── PENDING VISITS ─────────────────────────────────
+function getPending() {
+  return JSON.parse(localStorage.getItem("tm_pending") || "[]");
+}
+
+function savePending(list) {
+  localStorage.setItem("tm_pending", JSON.stringify(list));
+}
+
+function addPending(restaurant) {
+  const list = getPending();
+  if (list.find((r) => r.place_id === restaurant.place_id)) return;
+  list.push({ ...restaurant, pending_at: new Date().toISOString() });
+  savePending(list);
+}
+
+function removePending(place_id) {
+  savePending(getPending().filter((r) => r.place_id !== place_id));
+}
+
+// ── SIDEBAR ────────────────────────────────────────
+function renderSidebar() {
+  const pending = getPending();
+
+  const badge = document.getElementById("pending-badge");
+  const pendingSection = document.getElementById("pending-section");
+  const divider = document.getElementById("pending-divider");
+
+  if (badge) {
+    badge.textContent = pending.length;
+    badge.style.display = pending.length > 0 ? "inline-flex" : "none";
+  }
+  if (pendingSection) {
+    pendingSection.style.display = pending.length > 0 ? "block" : "none";
+  }
+  if (divider) {
+    divider.style.display = pending.length > 0 ? "block" : "none";
+  }
+
+  ui.renderPendingList(pending);
 }
 
 // ── HISTORY ────────────────────────────────────────
@@ -233,6 +302,7 @@ async function refreshHistory() {
     return [];
   }
 }
+
 // ── RECOMMENDATIONS ────────────────────────────────
 async function handleGetRecommendations() {
   const craving = document.getElementById("craving-input").value.trim();
@@ -254,9 +324,7 @@ async function handleGetRecommendations() {
       null,
       state.searchRadius,
     );
-
     clearInterval(stepInterval);
-
     if (!data.success) throw new Error();
     ui.renderRecommendations(data, handleSaveVisit);
   } catch {
@@ -267,54 +335,91 @@ async function handleGetRecommendations() {
   }
 }
 
-// ── SAVE VISIT ─────────────────────────────────────
+// ── SAVE VISIT (marks pending, no DB yet) ──────────
 async function handleSaveVisit(restaurant, btn) {
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Saving…";
+    btn.textContent = "Pending feedback →";
+    btn.classList.add("saved");
   }
+  addPending(restaurant);
+  renderSidebar();
+  ui.showToast(
+    "Saved to Pending Feedback ✦ Come back after your meal!",
+    "gold",
+  );
+}
+
+// ── REVIEW SLIP ────────────────────────────────────
+function openReviewSlip(place_id) {
+  const restaurant = getPending().find((r) => r.place_id === place_id);
+  if (!restaurant) return;
+  state.pendingRateVisit = restaurant;
+  state.selectedRating = 0;
+  ui.renderReviewSlip(restaurant);
+}
+
+async function handleSubmitReview() {
+  if (!state.selectedRating || !state.pendingRateVisit) return;
+
+  const notes = document.getElementById("review-notes")?.value.trim() || "";
+  const restaurant = state.pendingRateVisit;
+
+  const btn = document.getElementById("review-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
 
   try {
-    const data = await api.saveVisit(state.currentUser.user_code, restaurant);
+    // 1. Save visit to DB
+    const visitData = await api.saveVisit(
+      state.currentUser.user_code,
+      restaurant,
+    );
+    if (!visitData.success) throw new Error();
 
-    if (!data.success) throw new Error();
+    // 2. Save rating right after
+    await api.rateVisit(
+      state.currentUser.user_code,
+      visitData.visit_id,
+      state.selectedRating,
+      notes,
+    );
 
-    if (btn) {
-      btn.textContent = "✓ Saved!";
-      btn.classList.add("saved");
-    }
+    // 3. Remove from pending
+    removePending(restaurant.place_id);
 
-    state.pendingRateVisit = {
-      visit_id: data.visit_id,
-      name: restaurant.restaurant_name,
-    };
-    await refreshHistory();
+    // 4. Auto update taste if highly rated
+    if (state.selectedRating >= 4) await autoUpdateTaste();
 
-    // Auto prompt rating after short delay
-    setTimeout(() => {
-      openRatingModal(data.visit_id, restaurant.restaurant_name);
-    }, 1000);
+    // 5. Refresh history and sidebar
+    const visits = await refreshHistory();
+    ui.renderHeader(state.currentUser, visits.length);
+    renderSidebar();
+
+    ui.showToast("Review saved! TasteMind just got smarter ✦", "gold");
+    ui.renderEmpty();
+
+    state.pendingRateVisit = null;
+    state.selectedRating = 0;
   } catch {
-    ui.showToast("Could not save visit");
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "I'm going here →";
-    }
+    ui.showToast("Could not save review");
+    btn.disabled = false;
+    btn.textContent = "Submit review →";
   }
 }
 
-// ── RATING ─────────────────────────────────────────
+// ── LEGACY RATING MODAL (re-rating history items) ──
 function openRatingModal(visit_id, name) {
   state.selectedRating = 0;
   state.pendingRateVisit = { visit_id, name };
   ui.renderRatingModal(visit_id, name);
 }
+
 async function handleSubmitRating() {
   if (!state.selectedRating) return;
 
   const notes = document.getElementById("rate-notes")?.value.trim() || "";
   const visit_id = state.pendingRateVisit?.visit_id;
-
   if (!visit_id) return;
 
   const btn = document.getElementById("modal-confirm-btn");
@@ -328,17 +433,13 @@ async function handleSubmitRating() {
       state.selectedRating,
       notes,
     );
-
     if (!data.success) throw new Error();
 
     ui.closeModal();
     ui.showToast("Rating saved! TasteMind just got smarter ✦", "gold");
     await refreshHistory();
 
-    // If rated highly auto update liked cuisines
-    if (state.selectedRating >= 4 && state.pendingRateVisit) {
-      await autoUpdateTaste();
-    }
+    if (state.selectedRating >= 4) await autoUpdateTaste();
 
     state.pendingRateVisit = null;
     state.selectedRating = 0;
@@ -349,13 +450,12 @@ async function handleSubmitRating() {
   }
 }
 
-// Auto update taste profile when user rates something 4 or 5 stars
+// ── TASTE AUTO-UPDATE ──────────────────────────────
 async function autoUpdateTaste() {
   try {
     const visitsData = await api.getVisits(state.currentUser.user_code);
     const visits = visitsData.visits || [];
 
-    // Pull cuisines from highly rated visits
     const liked = [
       ...new Set(
         visits
@@ -368,8 +468,6 @@ async function autoUpdateTaste() {
       await api.updateTaste(state.currentUser.user_code, {
         liked_cuisines: liked,
       });
-
-      // Refresh user data so taste tags update
       const userData = await api.getUser(state.currentUser.user_code);
       if (userData.success) {
         state.currentUser = userData.user;
@@ -381,10 +479,21 @@ async function autoUpdateTaste() {
   }
 }
 
+// ── RATE A MEAL NAV BTN ────────────────────────────
 function handleRatePrompt() {
-  if (!state.pendingRateVisit) {
-    ui.showToast("Go visit a restaurant first! 🍽️");
+  const pending = getPending();
+  if (pending.length > 0) {
+    document
+      .getElementById("pending-section")
+      ?.scrollIntoView({ behavior: "smooth" });
     return;
   }
-  openRatingModal(state.pendingRateVisit.visit_id, state.pendingRateVisit.name);
+  if (state.pendingRateVisit) {
+    openRatingModal(
+      state.pendingRateVisit.visit_id,
+      state.pendingRateVisit.name,
+    );
+    return;
+  }
+  ui.showToast("Go visit a restaurant first! 🍽️");
 }

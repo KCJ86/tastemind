@@ -65,15 +65,16 @@ router.post(
             radius || 10,
             coordinates,
           );
+          // Take top 2 results per option
           return {
             label: option.label,
-            place: places[0] || null,
+            places: places.slice(0, 2),
           };
         }),
       );
 
-      // 5. Filter out any options where no place was found
-      const validOptions = options.filter((o) => o.place !== null);
+      // Filter out options where no places were found
+      const validOptions = options.filter((o) => o.places.length > 0);
 
       res.json({
         success: true,

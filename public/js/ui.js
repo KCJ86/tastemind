@@ -2,6 +2,10 @@
 // All DOM rendering lives here.
 // No fetch calls, no business logic — just building HTML.
 
+// ── RESTAURANT DATA STORE ──────────────────────────
+// Keeps restaurant data in memory instead of encoding into DOM attributes
+const restaurantStore = new Map();
+
 const ui = {
   // ── UTILS ─────────────────────────────────────────
   showScreen: (id) => {
@@ -184,15 +188,16 @@ const ui = {
   renderRecommendations: (data, onSave) => {
     const groups = data.options
       .map((option) => {
-        if (!option.place) return "";
+        if (!option.places || option.places.length === 0) return "";
+        const cards = option.places
+          .map((p) => ui.restaurantCard(p, option.label, onSave))
+          .join("");
         return `
         <div class="rec-group">
           <div class="rec-group-header">
             <div class="rec-cuisine">${option.label}</div>
           </div>
-          <div class="cards-row">
-            ${ui.restaurantCard(option.place, option.label, onSave)}
-          </div>
+          <div class="cards-row">${cards}</div>
         </div>
       `;
       })
@@ -219,40 +224,38 @@ const ui = {
           ? '<span class="meta-pill closed">Closed</span>'
           : "";
 
-    // Encode restaurant data for the save button
-    const data = encodeURIComponent(
-      JSON.stringify({
-        place_id: p.place_id,
-        restaurant_name: p.name,
-        cuisine_type: cuisine,
-        price_level: ui.priceLevelInt(p.price_level),
-        address: p.address,
-      }),
-    );
+    // Store restaurant data in memory, keyed by place_id
+    restaurantStore.set(p.place_id, {
+      place_id: p.place_id,
+      restaurant_name: p.name,
+      cuisine_type: cuisine,
+      price_level: ui.priceLevelInt(p.price_level),
+      address: p.address,
+    });
 
     return `
-      <div class="restaurant-card">
-        <div class="card-name">${p.name}</div>
-        <div class="card-address">${p.address || ""}</div>
-        <div class="card-meta">
-          ${
-            p.rating
-              ? `<span class="meta-pill rating">★ ${p.rating} (${p.total_ratings?.toLocaleString() || 0})</span>`
-              : ""
-          }
-          ${price ? `<span class="meta-pill">${price}</span>` : ""}
-          ${openBadge}
-        </div>
-        <div class="card-actions">
-          <button
-            class="card-save-btn"
-            data-restaurant="${data}"
-          >
-            I'm going here →
-          </button>
-        </div>
+    <div class="restaurant-card">
+      <div class="card-name">${p.name}</div>
+      <div class="card-address">${p.address || ""}</div>
+      <div class="card-meta">
+        ${
+          p.rating
+            ? `<span class="meta-pill rating">★ ${p.rating} (${p.total_ratings?.toLocaleString() || 0})</span>`
+            : ""
+        }
+        ${price ? `<span class="meta-pill">${price}</span>` : ""}
+        ${openBadge}
       </div>
-    `;
+      <div class="card-actions">
+        <button
+          class="card-save-btn"
+          data-place-id="${p.place_id}"
+        >
+          I'm going here →
+        </button>
+      </div>
+    </div>
+  `;
   },
 
   // ── RATING MODAL ──────────────────────────────────
@@ -289,6 +292,72 @@ const ui = {
         </div>
       </div>
     `;
+  },
+
+  // ── SIDEBAR TABS ──────────────────────────────────
+  renderPendingList: (pending) => {
+    const list = document.getElementById("pending-list");
+    if (!list) return;
+    if (!pending || pending.length === 0) {
+      list.innerHTML = "";
+      return;
+    }
+    list.innerHTML = pending
+      .map(
+        (r) => `
+      <div class="pending-item history-item" data-place-id="${r.place_id}">
+        <div>
+          <div class="history-name">${r.restaurant_name}</div>
+          <div class="history-meta">${r.cuisine_type || "Restaurant"} · Tap to review</div>
+        </div>
+        <div class="pending-dot">●</div>
+      </div>
+    `,
+      )
+      .join("");
+  },
+
+  // ── REVIEW SLIP ───────────────────────────────────
+  renderReviewSlip: (restaurant) => {
+    document.getElementById("main-content").innerHTML = `
+      <div class="review-slip">
+        <div class="review-slip-eyebrow">Pending feedback</div>
+        <div class="review-slip-name">${restaurant.restaurant_name}</div>
+        <div class="review-slip-meta">${restaurant.cuisine_type || ""} ${restaurant.address ? "· " + restaurant.address : ""}</div>
+
+        <div class="review-section-label">How was your meal?</div>
+        <div class="star-row" id="review-star-row">
+          ${[1, 2, 3, 4, 5]
+            .map(
+              (n) =>
+                `<span class="star review-star" data-value="${n}">★</span>`,
+            )
+            .join("")}
+        </div>
+
+        <textarea
+          class="fancy-input"
+          id="review-notes"
+          placeholder="Any notes? e.g. 'broth was incredible, a bit loud though'"
+          rows="3"
+          style="margin-top: 12px"
+        ></textarea>
+
+        <div class="review-actions">
+          <button class="modal-cancel" id="review-cancel-btn">Cancel</button>
+          <button class="modal-confirm" id="review-submit-btn" disabled>
+            Submit review →
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
+  // ── REVIEW STAR UPDATES ───────────────────────────
+  updateReviewStars: (n) => {
+    document.querySelectorAll(".review-star").forEach((s, i) => {
+      s.classList.toggle("active", i < n);
+    });
   },
 
   // ── STAR INTERACTIONS ─────────────────────────────

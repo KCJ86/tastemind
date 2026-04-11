@@ -1,7 +1,7 @@
 /**
  * Author: Kennedy Castillon Jimenez
  * Date: March 27th, 2026
- * Summary: The main portion of our claude service to process and build the prompts for response.
+ * Summary: Claude service — builds prompts and parses responses.
  */
 const Anthropic = require("@anthropic-ai/sdk");
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -58,33 +58,34 @@ ${visitHistory}
 Their craving right now: "${craving}"
 
 Based on all of this, identify ONE dining vibe or experience that best matches their craving and mood.
-Then generate exactly 3 different restaurant search queries that each express that vibe in a different way —
+Then generate exactly 3 different restaurant options that each express that vibe differently —
 different cuisines, different styles, or different takes on the same feeling.
 
-The 3 options should feel meaningfully different from each other, not just the same cuisine with different words.
-Think: if someone wants "warm and comforting soup", options might be pho, ramen, and pozole — same vibe, different worlds.
-
-IMPORTANT: Do NOT include any city or location name in any search_query — location is handled separately.
-Keep each search_query focused only on cuisine type, atmosphere, and food descriptors.
+CRITICAL search_query rules:
+- Keep each search_query to 2-4 words MAX — short queries work best with Google Places
+- Use only the cuisine type and 1-2 descriptors — nothing flowery or overly specific
+- Good examples: "pho noodle soup", "ramen restaurant", "mexican pozole", "sushi omakase", "italian pasta"
+- Bad examples: "artisan handcrafted slow-cooked heritage grain bread sandwich shop"
+- Never include city names or locations in search_query
 
 Respond ONLY with this JSON shape:
 {
   "summary": "one sentence describing what you understood about their mood/craving",
-  "vibe": "Warm & Comforting",
+  "vibe": "Short Vibe Name",
   "reason": "personalized reason referencing their history and why this vibe fits",
   "price_range": "$$",
   "options": [
     {
       "label": "Vietnamese Pho",
-      "search_query": "Vietnamese pho rich broth noodles"
+      "search_query": "pho vietnamese"
     },
     {
       "label": "Japanese Ramen",
-      "search_query": "Japanese ramen tonkotsu cozy"
+      "search_query": "ramen japanese"
     },
     {
       "label": "Mexican Pozole",
-      "search_query": "Mexican pozole hominy soup comfort food"
+      "search_query": "pozole mexican"
     }
   ]
 }`;
