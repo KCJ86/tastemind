@@ -89,6 +89,8 @@ document.addEventListener("click", (e) => {
   // Review slip cancel
   if (e.target.closest("#review-cancel-btn")) {
     ui.renderEmpty();
+    mobileShowSidebar();
+
     return;
   }
 
@@ -424,6 +426,7 @@ async function handleGetRecommendations() {
 
     if (!data.success) throw new Error();
     ui.renderRecommendations(data, handleSaveVisit);
+    mobileShowResults();
   } catch {
     clearInterval(stepInterval);
     ui.renderError();
@@ -454,6 +457,7 @@ function openReviewSlip(place_id) {
   state.pendingRateVisit = restaurant;
   state.selectedRating = 0;
   ui.renderReviewSlip(restaurant);
+  mobileShowResults();
 }
 
 async function handleSubmitReview() {
@@ -593,4 +597,23 @@ function handleRatePrompt() {
     return;
   }
   ui.showToast("Go visit a restaurant first! 🍽️");
+}
+
+// ── MOBILE NAV ─────────────────────────────────────
+function isMobile() {
+  return window.innerWidth <= 768;
+}
+
+function mobileShowResults() {
+  if (!isMobile()) return;
+  document.querySelector(".sidebar").classList.add("slide-out");
+  document.getElementById("main-content").classList.add("slide-in");
+  document.getElementById("mobile-new-search")?.classList.add("visible");
+}
+
+function mobileShowSidebar() {
+  if (!isMobile()) return;
+  document.querySelector(".sidebar").classList.remove("slide-out");
+  document.getElementById("main-content").classList.remove("slide-in");
+  document.getElementById("mobile-new-search")?.classList.remove("visible");
 }

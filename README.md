@@ -182,4 +182,4 @@ Shoot me a message and let me know what would be dope to add! `:)`
 
 ---
 
-_TasteMind — because "I don't know, what do you want?" is not a valid answer._.
+_TasteMind — because "I don't know, what do you want?" is not a valid answer._
