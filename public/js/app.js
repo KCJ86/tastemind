@@ -138,6 +138,7 @@ document.addEventListener("click", (e) => {
 
   // Sign out
   if (e.target.closest("#dropdown-signout")) {
+    document.body.classList.remove("app-active");
     localStorage.removeItem("tm_user_code");
     state.currentUser = null;
     state.selectedRating = 0;
@@ -333,6 +334,7 @@ async function fetchAndEnterApp(code) {
 
 function enterApp() {
   ui.showScreen("app");
+  document.body.classList.add("app-active"); // ← add this
   refreshHistory().then((visits) => {
     ui.renderHeader(state.currentUser, visits ? visits.length : 0);
     ui.renderTasteTags(state.currentUser);
@@ -340,7 +342,6 @@ function enterApp() {
     initLocation();
   });
 }
-
 // ── PENDING VISITS ─────────────────────────────────
 function getPending() {
   return JSON.parse(localStorage.getItem("tm_pending") || "[]");
