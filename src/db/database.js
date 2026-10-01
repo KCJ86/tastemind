@@ -8,9 +8,7 @@ const { Pool } = require("pg");
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
+    process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
 
 const initDb = async () => {
@@ -80,6 +78,48 @@ const initDb = async () => {
   } finally {
     client.release();
   }
+
+  await initRag();
 };
 
-module.exports = { pool, initDb };
+// ─── RAG (pgvector) ────────────────────────────────────
+// Kept separate from the core tables on purpose: if the database doesn't
+// have pgvector installed, the app still boots and recommendations fall
+// back to the old "last 10 visits" behavior instead of crashing.
+let ragEnabled = false;
+
+const initRag = async () => {
+  try {
+    await pool.query(`
+      CREATE EXTENSION IF NOT EXISTS vector;
+
+      -- One embedding per visit. Re-rating a visit overwrites its row (upsert),
+      -- so retrieval always reflects the user's latest opinion.
+      CREATE TABLE IF NOT EXISTS review_embeddings (
+        visit_id INTEGER PRIMARY KEY REFERENCES visits(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        content TEXT NOT NULL,            -- exact text that was embedded
+        embedding vector(1024) NOT NULL,
+        model TEXT NOT NULL,              -- vectors from different models aren't comparable
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Every retrieval is scoped to one user, so this filter does the heavy
+      -- lifting. With tens of reviews per user, an exact scan over that user's
+      -- rows is fast; an approximate (HNSW) index isn't needed yet.
+      CREATE INDEX IF NOT EXISTS idx_review_embeddings_user
+        ON review_embeddings(user_id);
+    `);
+    ragEnabled = true;
+    console.log("✅ RAG enabled (pgvector)");
+  } catch (err) {
+    console.warn(
+      "⚠️  RAG disabled — pgvector unavailable, using recency fallback:",
+      err.message,
+    );
+  }
+};
+
+const isRagEnabled = () => ragEnabled;
+
+module.exports = { pool, initDb, isRagEnabled };

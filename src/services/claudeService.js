@@ -6,36 +6,47 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const buildTasteContext = (user, recentVisits) => {
+const formatVisit = (v) => {
+  const ratingStr = v.rating ? `rated ${v.rating}/5` : "not yet rated";
+  const notesStr = v.notes ? ` — "${v.notes}"` : "";
+  return `- ${v.restaurant_name} (${v.cuisine_type || "unknown cuisine"}, ${ratingStr}${notesStr})`;
+};
+
+// visitContext comes from retrievalService.getVisitContext():
+//   recent   — latest meals, in date order
+//   relevant — older reviews retrieved by semantic similarity to the craving
+const buildTasteContext = (user, visitContext) => {
   const liked = JSON.parse(user.liked_cuisines || "[]");
   const disliked = JSON.parse(user.disliked_cuisines || "[]");
   const dietary = JSON.parse(user.dietary_restrictions || "[]");
+  const { recent, relevant } = visitContext;
 
-  const visitHistory =
-    recentVisits.length > 0
-      ? recentVisits
-          .map((v) => {
-            const ratingStr = v.rating
-              ? `rated ${v.rating}/5`
-              : "not yet rated";
-            const notesStr = v.notes ? ` — "${v.notes}"` : "";
-            return `- ${v.restaurant_name} (${v.cuisine_type || "unknown cuisine"}, ${ratingStr}${notesStr})`;
-          })
-          .join("\n")
-      : "No visit history yet — this is their first recommendation.";
+  let visitHistory;
+  if (recent.length === 0 && relevant.length === 0) {
+    visitHistory = "No visit history yet — this is their first recommendation.";
+  } else {
+    visitHistory = `Most recent meals:\n${
+      recent.length > 0 ? recent.map(formatVisit).join("\n") : "- none"
+    }`;
+    if (relevant.length > 0) {
+      visitHistory += `\n\nPast reviews most relevant to this craving (use these to ground your reasoning — lean toward what they rated highly, steer away from what they rated poorly):\n${relevant
+        .map(formatVisit)
+        .join("\n")}`;
+    }
+  }
 
   return { liked, disliked, dietary, visitHistory };
 };
 
 const getRestaurantRecommendations = async (
   user,
-  recentVisits,
+  visitContext,
   craving,
   location,
 ) => {
   const { liked, disliked, dietary, visitHistory } = buildTasteContext(
     user,
-    recentVisits,
+    visitContext,
   );
 
   const systemPrompt = `You are TasteMind, a personal AI dining concierge.
@@ -52,7 +63,7 @@ Liked cuisines: ${liked.length > 0 ? liked.join(", ") : "not set yet"}
 Disliked cuisines: ${disliked.length > 0 ? disliked.join(", ") : "none"}
 Dietary restrictions: ${dietary.length > 0 ? dietary.join(", ") : "none"}
 
-Recent dining history:
+Dining history:
 ${visitHistory}
 
 Their craving right now: "${craving}"
@@ -105,4 +116,4 @@ Respond ONLY with this JSON shape:
   }
 };
 
-module.exports = { getRestaurantRecommendations };
+module.exports = { getRestaurantRecommendations, buildTasteContext };

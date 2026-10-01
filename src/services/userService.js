@@ -82,7 +82,13 @@ const getRecentVisits = async (user_id, limit = 10) => {
   const result = await pool.query(
     `SELECT v.*, r.rating, r.notes
      FROM visits v
-     LEFT JOIN ratings r ON r.visit_id = v.id
+     -- latest rating only, so a re-rated visit doesn't appear twice
+     LEFT JOIN LATERAL (
+       SELECT rating, notes FROM ratings
+       WHERE visit_id = v.id
+       ORDER BY rated_at DESC, id DESC
+       LIMIT 1
+     ) r ON true
      WHERE v.user_id = $1
      ORDER BY v.visited_at DESC
      LIMIT $2`,
@@ -107,12 +113,17 @@ const saveVisit = async (user_id, restaurant) => {
   return { lastInsertRowid: result.rows[0].id };
 };
 
+// Only inserts if the visit belongs to this user. Returns false otherwise.
+// (Previously any user_code could rate any visit_id — and with RAG, that text
+// would be embedded into the visit OWNER's retrieval context.)
 const saveRating = async (visit_id, user_id, rating, notes) => {
-  await pool.query(
+  const result = await pool.query(
     `INSERT INTO ratings (visit_id, user_id, rating, notes)
-     VALUES ($1, $2, $3, $4)`,
+     SELECT $1::int, $2::int, $3::int, $4::text
+     WHERE EXISTS (SELECT 1 FROM visits WHERE id = $1::int AND user_id = $2::int)`,
     [visit_id, user_id, rating, notes || null],
   );
+  return result.rowCount > 0;
 };
 
 const DAILY_RECOMMENDATION_LIMIT = 20;

@@ -13,7 +13,8 @@ const {
   getRecentVisits,
   saveRating,
 } = require("../services/userService");
-const { pool } = require("../db/database");
+const { pool, isRagEnabled } = require("../db/database");
+const { indexReviews } = require("../services/retrievalService");
 const {
   getUserCoordinates,
   getResolvedLocationName,
@@ -98,12 +99,26 @@ router.post(
     try {
       const user = await getUserByCode(req.params.code);
       if (!user) return res.status(404).json({ error: "User not found" });
-      await saveRating(
-        parseInt(req.params.id),
+      const visitId = parseInt(req.params.id);
+      const saved = await saveRating(
+        visitId,
         user.id,
         req.body.rating,
         req.body.notes,
       );
+      if (!saved) return res.status(404).json({ error: "Visit not found" });
+
+      // Embed the review so it's retrievable on future cravings. A failure
+      // here must not fail the review the user just wrote — it's logged and
+      // `npm run backfill:embeddings` picks up anything that was missed.
+      if (isRagEnabled()) {
+        try {
+          await indexReviews([visitId]);
+        } catch (err) {
+          console.error(`Embedding failed for visit ${visitId}:`, err.message);
+        }
+      }
+
       res.json({ success: true });
     } catch (err) {
       console.error(err);

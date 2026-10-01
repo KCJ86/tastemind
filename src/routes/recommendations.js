@@ -8,13 +8,13 @@ const router = express.Router();
 const { body, validationResult } = require("express-validator");
 const {
   getUserByCode,
-  getRecentVisits,
   saveVisit,
   getDailyRecommendationCount,
   logRecommendation,
   DAILY_RECOMMENDATION_LIMIT,
 } = require("../services/userService");
 const { getRestaurantRecommendations } = require("../services/claudeService");
+const { getVisitContext } = require("../services/retrievalService");
 const {
   searchRestaurant,
   getUserCoordinates,
@@ -51,11 +51,18 @@ router.post(
         });
       }
 
-      const recentVisits = await getRecentVisits(user.id, 10);
+      // RAG: recent meals + past reviews most relevant to this craving
+      const visitContext = await getVisitContext(user.id, craving);
+      console.log(
+        `🔎 Context [${visitContext.mode}] recent=${visitContext.recent.length}`,
+        visitContext.relevant.map(
+          (v) => `${v.restaurant_name}(${Number(v.similarity).toFixed(2)})`,
+        ),
+      );
 
       const claudeResponse = await getRestaurantRecommendations(
         user,
-        recentVisits,
+        visitContext,
         craving,
         location,
       );
