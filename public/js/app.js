@@ -45,7 +45,33 @@ function bindStaticEvents() {
 
 // ── DELEGATED CLICK HANDLER ────────────────────────
 document.addEventListener("click", (e) => {
-  console.log("clicked:", e.target.id, e.target.className);
+  // Open / close the "Your meals" drawer
+  if (e.target.closest("#meals-btn")) {
+    ui.openDrawer();
+    return;
+  }
+  if (e.target.closest("#drawer-close") || e.target.id === "drawer-scrim") {
+    ui.closeDrawer();
+    return;
+  }
+
+  // Suggestion chip — fill the search box so the user can edit or send it
+  const chip = e.target.closest(".chip");
+  if (chip) {
+    const input = document.getElementById("craving-input");
+    input.value = chip.dataset.craving;
+    input.focus();
+    return;
+  }
+
+  // Star on the "Waiting for your review" prompt — open the full review
+  // with that rating already selected
+  const promptStar = e.target.closest(".prompt-star");
+  if (promptStar) {
+    const placeId = promptStar.closest(".stars").dataset.placeId;
+    openReviewSlip(placeId, parseInt(promptStar.dataset.value));
+    return;
+  }
 
   // Save restaurant button
   const saveBtn = e.target.closest(".card-save-btn");
@@ -59,6 +85,7 @@ document.addEventListener("click", (e) => {
   // Pending list item — open review slip
   const pendingItem = e.target.closest(".pending-item");
   if (pendingItem) {
+    ui.closeDrawer();
     openReviewSlip(pendingItem.dataset.placeId);
     return;
   }
@@ -67,6 +94,7 @@ document.addEventListener("click", (e) => {
   const historyItem = e.target.closest(".history-item:not(.pending-item)");
   if (historyItem) {
     const { visitId, visitName } = historyItem.dataset;
+    ui.closeDrawer();
     openRatingModal(parseInt(visitId), visitName);
     return;
   }
@@ -89,8 +117,7 @@ document.addEventListener("click", (e) => {
   // Review slip cancel
   if (e.target.closest("#review-cancel-btn")) {
     ui.renderEmpty();
-    mobileShowSidebar();
-
+    renderSidebar(); // brings the review prompt back
     return;
   }
 
@@ -124,7 +151,7 @@ document.addEventListener("click", (e) => {
   // Copy user code
   if (e.target.closest("#copy-code-btn")) {
     navigator.clipboard.writeText(state.currentUser.user_code);
-    ui.showToast("Code copied to clipboard! ✦", "gold");
+    ui.showToast("Code copied");
     return;
   }
 
@@ -143,17 +170,11 @@ document.addEventListener("click", (e) => {
     state.currentUser = null;
     state.selectedRating = 0;
     state.pendingRateVisit = null;
-    document.getElementById("header-right").innerHTML = `
-      <button class="nav-btn" id="signin-btn">Sign in</button>
-    `;
+    ui.clearHeader();
+    ui.closeDrawer();
+    ui.renderEmpty();
     ui.showScreen("onboard");
-    ui.showToast("Signed out successfully");
-    return;
-  }
-
-  // Rate a meal nav btn
-  if (e.target.closest("#rate-btn")) {
-    handleRatePrompt();
+    ui.showToast("Signed out");
     return;
   }
 
@@ -172,6 +193,16 @@ document.addEventListener("click", (e) => {
     const dropdown = document.getElementById("user-dropdown");
     if (dropdown) dropdown.style.display = "none";
   }
+});
+
+// Escape closes whatever is on top: modal, then drawer, then account menu
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (document.getElementById("modal-overlay")) return ui.closeModal();
+  if (document.getElementById("drawer").classList.contains("open"))
+    return ui.closeDrawer();
+  const dropdown = document.getElementById("user-dropdown");
+  if (dropdown) dropdown.style.display = "none";
 });
 
 // ── LOCATION EDITING ───────────────────────────────
@@ -234,7 +265,7 @@ async function handleSaveLocation() {
       resolved.className = "location-resolved error";
       resolved.textContent = data.error;
       btn.disabled = false;
-      btn.textContent = "Confirm location →";
+      btn.textContent = "Update location";
       return;
     }
 
@@ -244,7 +275,7 @@ async function handleSaveLocation() {
     const resolved = document.getElementById("location-resolved");
     resolved.style.display = "block";
     resolved.className = "location-resolved success";
-    resolved.textContent = `✓ Found: ${data.location}`;
+    resolved.textContent = `Found ${data.location}`;
 
     // Update state + UI
     state.currentUser.location = data.location;
@@ -252,33 +283,39 @@ async function handleSaveLocation() {
 
     // Update dropdown location label
     const dropdownLocation = document.querySelector(".dropdown-location");
-    if (dropdownLocation) dropdownLocation.textContent = `📍 ${data.location}`;
+    if (dropdownLocation) dropdownLocation.textContent = data.location;
 
-    ui.showToast("Location updated! ✦", "gold");
+    ui.showToast("Location updated");
 
     setTimeout(() => closeLocationEdit(), 1500);
   } catch {
     ui.showToast("Could not update location");
     btn.disabled = false;
-    btn.textContent = "Confirm location →";
+    btn.textContent = "Update location";
   }
 }
 
 // ── STAR HOVER ─────────────────────────────────────
-document.addEventListener("mouseover", (e) => {
-  const star = e.target.closest(".star:not(.review-star)");
-  if (star) ui.updateStars(parseInt(star.dataset.value));
+// Previews a rating while hovering, then restores the chosen one.
+function highlightRow(row, n) {
+  row.querySelectorAll(".star-btn").forEach((s, i) => {
+    s.classList.toggle("active", i < n);
+  });
+}
 
-  const reviewStar = e.target.closest(".review-star");
-  if (reviewStar) ui.updateReviewStars(parseInt(reviewStar.dataset.value));
+document.addEventListener("mouseover", (e) => {
+  const star = e.target.closest(".star-btn");
+  if (star) highlightRow(star.parentElement, parseInt(star.dataset.value));
 });
 
 document.addEventListener("mouseout", (e) => {
-  const star = e.target.closest(".star:not(.review-star)");
-  if (star) ui.updateStars(state.selectedRating);
-
-  const reviewStar = e.target.closest(".review-star");
-  if (reviewStar) ui.updateReviewStars(state.selectedRating);
+  const star = e.target.closest(".star-btn");
+  if (!star) return;
+  // The prompt row has no saved selection; the slip and modal use state
+  const chosen = star.classList.contains("prompt-star")
+    ? 0
+    : state.selectedRating;
+  highlightRow(star.parentElement, chosen);
 });
 
 // ── USER HANDLERS ──────────────────────────────────
@@ -302,14 +339,13 @@ async function handleCreateUser() {
     localStorage.setItem("tm_user_code", data.user.user_code);
     enterApp();
     ui.showToast(
-      `Welcome, ${data.user.name}! Your code: ${data.user.user_code}`,
-      "gold",
+      `Welcome, ${data.user.name}. Your sign-in code is ${data.user.user_code}`,
     );
   } catch {
-    ui.showToast("Could not create profile. Is the server running?");
+    ui.showToast("Couldn't create your profile. Try again.");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Start my taste profile →";
+    btn.textContent = "Create my taste profile";
   }
 }
 
@@ -327,7 +363,7 @@ async function fetchAndEnterApp(code) {
     localStorage.setItem("tm_user_code", code);
     enterApp();
   } catch {
-    ui.showToast("User not found. Check your code.");
+    ui.showToast("No profile matches that code. Check it and try again.");
     localStorage.removeItem("tm_user_code");
   }
 }
@@ -368,7 +404,6 @@ function renderSidebar() {
 
   const badge = document.getElementById("pending-badge");
   const pendingSection = document.getElementById("pending-section");
-  const divider = document.getElementById("pending-divider");
 
   if (badge) {
     badge.textContent = pending.length;
@@ -377,11 +412,8 @@ function renderSidebar() {
   if (pendingSection) {
     pendingSection.style.display = pending.length > 0 ? "block" : "none";
   }
-  if (divider) {
-    divider.style.display = pending.length > 0 ? "block" : "none";
-  }
-
   ui.renderPendingList(pending);
+  ui.renderReviewPrompt(pending);
 }
 
 // ── HISTORY ────────────────────────────────────────
@@ -401,7 +433,8 @@ async function refreshHistory() {
 async function handleGetRecommendations() {
   const craving = document.getElementById("craving-input").value.trim();
   if (!craving) {
-    ui.showToast("Tell me what you're craving first!");
+    ui.showToast("Type a craving first");
+    document.getElementById("craving-input").focus();
     return;
   }
 
@@ -409,6 +442,7 @@ async function handleGetRecommendations() {
   btn.disabled = true;
 
   ui.renderLoading();
+  scrollToResults();
   const stepInterval = ui.startLoadingSteps();
 
   try {
@@ -426,8 +460,8 @@ async function handleGetRecommendations() {
     }
 
     if (!data.success) throw new Error();
-    ui.renderRecommendations(data, handleSaveVisit);
-    mobileShowResults();
+    ui.renderRecommendations(data);
+    scrollToResults();
   } catch {
     clearInterval(stepInterval);
     ui.renderError();
@@ -440,25 +474,23 @@ async function handleGetRecommendations() {
 async function handleSaveVisit(restaurant, btn) {
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Pending feedback →";
+    btn.textContent = "Saved for review";
     btn.classList.add("saved");
   }
   addPending(restaurant);
   renderSidebar();
-  ui.showToast(
-    "Saved to Pending Feedback ✦ Come back after your meal!",
-    "gold",
-  );
+  ui.showToast("Saved. Rate it after your meal.");
 }
 
 // ── REVIEW SLIP ────────────────────────────────────
-function openReviewSlip(place_id) {
+function openReviewSlip(place_id, rating = 0) {
   const restaurant = getPending().find((r) => r.place_id === place_id);
   if (!restaurant) return;
   state.pendingRateVisit = restaurant;
-  state.selectedRating = 0;
-  ui.renderReviewSlip(restaurant);
-  mobileShowResults();
+  state.selectedRating = rating;
+  ui.renderReviewSlip(restaurant, rating);
+  scrollToResults();
+  document.getElementById("review-notes")?.focus({ preventScroll: true });
 }
 
 async function handleSubmitReview() {
@@ -498,15 +530,15 @@ async function handleSubmitReview() {
     ui.renderHeader(state.currentUser, visits.length);
     renderSidebar();
 
-    ui.showToast("Review saved! TasteMind just got smarter ✦", "gold");
+    ui.showToast("Review saved");
     ui.renderEmpty();
 
     state.pendingRateVisit = null;
     state.selectedRating = 0;
   } catch {
-    ui.showToast("Could not save review");
+    ui.showToast("Couldn't save your review. Try again.");
     btn.disabled = false;
-    btn.textContent = "Submit review →";
+    btn.textContent = "Save review";
   }
 }
 
@@ -538,7 +570,7 @@ async function handleSubmitRating() {
     if (!data.success) throw new Error();
 
     ui.closeModal();
-    ui.showToast("Rating saved! TasteMind just got smarter ✦", "gold");
+    ui.showToast("Rating saved");
     await refreshHistory();
 
     if (state.selectedRating >= 4) await autoUpdateTaste();
@@ -546,9 +578,9 @@ async function handleSubmitRating() {
     state.pendingRateVisit = null;
     state.selectedRating = 0;
   } catch {
-    ui.showToast("Could not save rating");
+    ui.showToast("Couldn't save your rating. Try again.");
     btn.disabled = false;
-    btn.textContent = "Save rating →";
+    btn.textContent = "Save rating";
   }
 }
 
@@ -581,40 +613,11 @@ async function autoUpdateTaste() {
   }
 }
 
-// ── RATE A MEAL NAV BTN ────────────────────────────
-function handleRatePrompt() {
-  const pending = getPending();
-  if (pending.length > 0) {
-    document
-      .getElementById("pending-section")
-      ?.scrollIntoView({ behavior: "smooth" });
-    return;
-  }
-  if (state.pendingRateVisit) {
-    openRatingModal(
-      state.pendingRateVisit.visit_id,
-      state.pendingRateVisit.name,
-    );
-    return;
-  }
-  ui.showToast("Go visit a restaurant first! 🍽️");
-}
-
-// ── MOBILE NAV ─────────────────────────────────────
-function isMobile() {
-  return window.innerWidth <= 768;
-}
-
-function mobileShowResults() {
-  if (!isMobile()) return;
-  document.querySelector(".sidebar").classList.add("slide-out");
-  document.getElementById("main-content").classList.add("slide-in");
-  document.getElementById("mobile-new-search")?.classList.add("visible");
-}
-
-function mobileShowSidebar() {
-  if (!isMobile()) return;
-  document.querySelector(".sidebar").classList.remove("slide-out");
-  document.getElementById("main-content").classList.remove("slide-in");
-  document.getElementById("mobile-new-search")?.classList.remove("visible");
+// ── SCROLLING ──────────────────────────────────────
+// Brings results (or the review form) into view below the search area.
+function scrollToResults() {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document
+    .getElementById("main-content")
+    .scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
 }

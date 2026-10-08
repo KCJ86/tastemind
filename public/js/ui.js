@@ -6,8 +6,29 @@
 // Keeps restaurant data in memory instead of encoding into DOM attributes
 const restaurantStore = new Map();
 
+// Inline SVG icons, reused across templates
+const ICONS = {
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8l-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"/></svg>',
+  memory:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>',
+  meals:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3 4-3 7h3"/></svg>',
+};
+
 const ui = {
   // ── UTILS ─────────────────────────────────────────
+
+  // Escapes text before it goes into innerHTML. Names, notes and Claude's
+  // text are all outside data — without this, a name like
+  // <img src=x onerror=...> would run as code in the page.
+  esc: (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;"),
+
   showScreen: (id) => {
     document
       .querySelectorAll(".screen")
@@ -15,14 +36,24 @@ const ui = {
     document.getElementById(`screen-${id}`).classList.add("active");
   },
 
-  showToast: (msg, type = "") => {
+  showToast: (msg) => {
     const t = document.getElementById("toast");
     t.textContent = msg;
-    t.className = `toast ${type} show`;
-    setTimeout(() => (t.className = "toast"), 3000);
+    t.classList.add("show");
+    clearTimeout(ui._toastTimer);
+    ui._toastTimer = setTimeout(() => t.classList.remove("show"), 3000);
   },
 
-  stars: (n) => "★".repeat(n) + "☆".repeat(5 - n),
+  // Five star buttons. `cls` distinguishes the modal, slip and prompt rows
+  // so app.js's click handler knows which flow a click belongs to.
+  starButtons: (cls, active = 0) =>
+    [1, 2, 3, 4, 5]
+      .map(
+        (n) => `
+        <button class="star-btn ${cls}${n <= active ? " active" : ""}"
+          data-value="${n}" aria-label="${n} out of 5">${ICONS.star}</button>`,
+      )
+      .join(""),
 
   priceLevel: (level) => {
     const map = {
@@ -44,6 +75,13 @@ const ui = {
     return map[level] || null;
   },
 
+  greeting: () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
+    return "Good evening";
+  },
+
   // ── HEADER ────────────────────────────────────────
   renderHeader: (user, visitCount = 0) => {
     const initials = user.name
@@ -52,170 +90,170 @@ const ui = {
       .join("")
       .slice(0, 2)
       .toUpperCase();
-
     const liked = JSON.parse(user.liked_cuisines || "[]");
+
+    document.getElementById("greeting").textContent =
+      `${ui.greeting()}, ${user.name.split(" ")[0]}`;
+
     document.getElementById("header-right").innerHTML = `
-      <div class="user-pill" id="user-pill">
-        <div class="user-avatar">${initials}</div>
-        ${user.name}
-        <div class="user-dropdown" id="user-dropdown" style="display:none">
-
-          <div class="dropdown-header">
-            <div class="dropdown-name">${user.name}</div>
-            <div class="dropdown-location">📍 ${user.location || "No location set"}</div>
-            <div class="dropdown-code" id="copy-code-btn">
-              <div>
-                <div class="dropdown-code-label">Your return code</div>
-                <div class="dropdown-code-value">${user.user_code}</div>
-              </div>
-              <div class="dropdown-copy">copy</div>
-            </div>
+      <button class="meals-btn" id="meals-btn" aria-label="Your meals">
+        ${ICONS.meals}
+        <span class="meals-label">Your meals</span>
+        <span class="badge" id="pending-badge" style="display:none">0</span>
+      </button>
+      <div class="account">
+        <button class="avatar" id="user-pill" aria-label="Account" aria-haspopup="true">
+          ${ui.esc(initials)}
+        </button>
+        <div class="menu" id="user-dropdown" style="display:none">
+          <div class="menu-head">
+            <div class="menu-name">${ui.esc(user.name)}</div>
+            <div class="menu-sub dropdown-location">${ui.esc(user.location || "No location set")}</div>
+            <button class="code-row" id="copy-code-btn">
+              <span>
+                <span class="code-label">Your sign-in code</span><br />
+                <span class="code-value">${ui.esc(user.user_code)}</span>
+              </span>
+              <span class="code-copy">Copy</span>
+            </button>
+            <p class="menu-stats">${visitCount} ${visitCount === 1 ? "meal" : "meals"} reviewed, ${liked.length} favorite ${liked.length === 1 ? "cuisine" : "cuisines"}</p>
           </div>
-
-          <div class="dropdown-stats">
-            <div class="dropdown-stat">
-              <div class="dropdown-stat-value">${visitCount}</div>
-              <div class="dropdown-stat-label">Visits</div>
-            </div>
-            <div class="dropdown-stat">
-              <div class="dropdown-stat-value">${liked.length}</div>
-              <div class="dropdown-stat-label">Cuisines</div>
-            </div>
-          </div>
-
-          <div class="dropdown-item" id="dropdown-home">
-            <span class="dropdown-icon">🏠</span> Go to home
-          </div>
-          <div class="dropdown-item danger" id="dropdown-signout">
-            <span class="dropdown-icon">→</span> Sign out
-          </div>
-
+          <button class="menu-item" id="dropdown-home">Back to start</button>
+          <button class="menu-item danger" id="dropdown-signout">Sign out</button>
         </div>
       </div>
     `;
   },
 
+  clearHeader: () => {
+    document.getElementById("header-right").innerHTML = "";
+    document.getElementById("greeting").textContent = "";
+  },
+
+  // ── LOCATION ──────────────────────────────────────
+  renderLocation: (location) => {
+    const text = document.getElementById("location-text");
+    if (text) text.textContent = location || "No location set";
+  },
+
   // ── TASTE TAGS ────────────────────────────────────
   renderTasteTags: (user) => {
     const liked = JSON.parse(user.liked_cuisines || "[]");
-    const container = document.getElementById("taste-tags");
-    container.innerHTML =
+    document.getElementById("taste-tags").innerHTML =
       liked.length === 0
-        ? '<span class="taste-tag">No preferences yet</span>'
-        : liked
-            .map((c) => `<span class="taste-tag liked">${c}</span>`)
-            .join("");
+        ? '<p class="empty-note">Rate a meal 4 stars or higher and its cuisine shows up here.</p>'
+        : liked.map((c) => `<span class="tag">${ui.esc(c)}</span>`).join("");
   },
 
   // ── VISIT HISTORY ─────────────────────────────────
   renderHistory: (visits) => {
     const list = document.getElementById("history-list");
+    const section = list.parentElement;
+    section.querySelector(".empty-note")?.remove();
 
     if (!visits || visits.length === 0) {
-      list.innerHTML = '<div class="empty-history">No visits yet</div>';
+      list.innerHTML = "";
+      list.insertAdjacentHTML(
+        "beforebegin",
+        '<p class="empty-note">Meals you review will show up here.</p>',
+      );
       return;
     }
 
     list.innerHTML = visits
       .map(
         (v) => `
-      <div class="history-item" data-visit-id="${v.id}" data-visit-name="${v.restaurant_name}">
-        <div>
-          <div class="history-name">${v.restaurant_name}</div>
-          <div class="history-meta">
-            ${v.cuisine_type || "Unknown"} · ${new Date(v.visited_at).toLocaleDateString()}
-          </div>
-        </div>
-        <div class="history-stars">
-          ${v.rating ? ui.stars(v.rating) : "—"}
-        </div>
-      </div>
-    `,
+        <button class="list-item history-item" data-visit-id="${v.id}" data-visit-name="${ui.esc(v.restaurant_name)}">
+          <span>
+            <span class="item-name">${ui.esc(v.restaurant_name)}</span><br />
+            <span class="item-meta">${ui.esc(v.cuisine_type || "Restaurant")}, ${new Date(v.visited_at).toLocaleDateString()}</span>
+          </span>
+          <span class="item-rating">${v.rating ? `${v.rating} of 5` : "Not rated"}</span>
+        </button>`,
       )
       .join("");
   },
 
-  // ── SIDEBAR TABS ──────────────────────────────────
+  // ── PENDING ───────────────────────────────────────
   renderPendingList: (pending) => {
-    const list = document.getElementById("history-list");
-    if (!pending || pending.length === 0) {
-      list.innerHTML = '<div class="empty-history">No pending visits</div>';
-      return;
-    }
-    list.innerHTML = pending
+    const list = document.getElementById("pending-list");
+    if (!list) return;
+    list.innerHTML = (pending || [])
       .map(
         (r) => `
-        <div class="pending-item history-item" data-place-id="${r.place_id}">
-          <div>
-            <div class="history-name">${r.restaurant_name}</div>
-            <div class="history-meta">${r.cuisine_type || "Restaurant"} · Tap to review</div>
-          </div>
-          <div class="pending-dot">●</div>
-        </div>
-      `,
+        <button class="list-item pending-item" data-place-id="${ui.esc(r.place_id)}">
+          <span>
+            <span class="item-name">${ui.esc(r.restaurant_name)}</span><br />
+            <span class="item-meta">${ui.esc(r.cuisine_type || "Restaurant")}</span>
+          </span>
+          <span class="dot" aria-hidden="true"></span>
+        </button>`,
       )
       .join("");
+  },
+
+  // Most recent pending meal, shown above the results so the review loop
+  // is one tap away instead of buried in the drawer.
+  renderReviewPrompt: (pending) => {
+    const slot = document.getElementById("review-prompt");
+    const latest = pending && pending[pending.length - 1];
+    if (!latest) {
+      slot.innerHTML = "";
+      return;
+    }
+    slot.innerHTML = `
+      <div class="prompt steel">
+        <div>
+          <p class="prompt-label">Waiting for your review</p>
+          <h2 class="prompt-title">How was ${ui.esc(latest.restaurant_name)}?</h2>
+        </div>
+        <div class="stars" data-place-id="${ui.esc(latest.place_id)}">
+          ${ui.starButtons("prompt-star")}
+        </div>
+      </div>`;
   },
 
   // ── REVIEW SLIP ───────────────────────────────────
-  renderReviewSlip: (restaurant) => {
+  renderReviewSlip: (restaurant, rating = 0) => {
+    document.getElementById("review-prompt").innerHTML = "";
     document.getElementById("main-content").innerHTML = `
-      <div class="review-slip">
-        <div class="review-slip-eyebrow">Pending feedback</div>
-        <div class="review-slip-name">${restaurant.restaurant_name}</div>
-        <div class="review-slip-meta">${restaurant.cuisine_type || ""} ${restaurant.address ? "· " + restaurant.address : ""}</div>
-
-        <div class="review-section-label">How was your meal?</div>
-        <div class="star-row" id="review-star-row">
-          ${[1, 2, 3, 4, 5]
-            .map(
-              (n) =>
-                `<span class="star review-star" data-value="${n}">★</span>`,
-            )
-            .join("")}
+      <div class="panel slip">
+        <p class="prompt-label">Your review</p>
+        <h2 class="slip-title">${ui.esc(restaurant.restaurant_name)}</h2>
+        <p class="slip-meta">${ui.esc([restaurant.cuisine_type, restaurant.address].filter(Boolean).join(", "))}</p>
+        <div class="stars" id="review-star-row">${ui.starButtons("review-star", rating)}</div>
+        <label class="visually-hidden" for="review-notes">Notes</label>
+        <textarea class="field" id="review-notes" rows="3"
+          placeholder="What stood out? e.g. the broth was incredible, a bit loud though"></textarea>
+        <div class="slip-actions">
+          <button class="btn btn-secondary" id="review-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="review-submit-btn" ${rating ? "" : "disabled"}>Save review</button>
         </div>
-
-        <textarea
-          class="fancy-input"
-          id="review-notes"
-          placeholder="Any notes? e.g. 'broth was incredible, a bit loud though'"
-          rows="3"
-          style="margin-top: 12px"
-        ></textarea>
-
-        <div class="review-actions">
-          <button class="modal-cancel" id="review-cancel-btn">Cancel</button>
-          <button class="modal-confirm" id="review-submit-btn" disabled>
-            Submit review →
-          </button>
-        </div>
-      </div>
-    `;
+      </div>`;
   },
 
-  // ── REVIEW STAR UPDATES ───────────────────────────
   updateReviewStars: (n) => {
     document.querySelectorAll(".review-star").forEach((s, i) => {
       s.classList.toggle("active", i < n);
     });
   },
+
   // ── LOADING STATE ─────────────────────────────────
   renderLoading: () => {
     document.getElementById("main-content").innerHTML = `
-      <div class="loading-state">
-        <div class="loading-ring"></div>
-        <div class="loading-text">Consulting your palate…</div>
-        <div class="loading-step">Claude is thinking</div>
-      </div>
-    `;
+      <div class="state" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="state-title">Finding your table</p>
+        <p class="state-sub loading-step">Reading your taste history</p>
+      </div>`;
   },
 
-  // Cycles through loading steps while waiting for API
+  // Cycles through loading steps while waiting for the API
   startLoadingSteps: () => {
     const steps = [
-      "Reading your taste history…",
-      "Finding perfect matches…",
-      "Checking what's nearby…",
+      "Matching your craving to past meals",
+      "Checking what's nearby",
+      "Picking the best fits",
     ];
     let i = 0;
     return setInterval(() => {
@@ -224,89 +262,64 @@ const ui = {
     }, 1800);
   },
 
-  // ── EMPTY STATE ───────────────────────────────────
+  // ── EMPTY / ERROR / LIMIT ─────────────────────────
+  // The search area above already invites a craving, so the empty state is
+  // simply empty.
   renderEmpty: () => {
-    document.getElementById("main-content").innerHTML = `
-      <div class="empty-state">
-        <div class="empty-glyph">✦</div>
-        <div class="empty-title">Where shall we dine tonight?</div>
-        <div class="empty-sub">Describe your craving in the panel and let TasteMind find your perfect meal.</div>
-      </div>
-    `;
+    document.getElementById("main-content").innerHTML = "";
   },
 
-  // ── ERROR STATE ───────────────────────────────────
   renderError: () => {
     document.getElementById("main-content").innerHTML = `
-      <div class="empty-state">
-        <div class="empty-glyph">!</div>
-        <div class="empty-title">Something went wrong</div>
-        <div class="empty-sub">Make sure the backend is running on port 3000</div>
-      </div>
-    `;
+      <div class="state">
+        <p class="state-title">Recommendations didn't load</p>
+        <p class="state-sub">Check your connection and try your search again.</p>
+      </div>`;
   },
 
-  // ── Limiter ────────────────────────
   renderLimitReached: () => {
     document.getElementById("main-content").innerHTML = `
-    <div class="limit-wrap">
-      <div class="limit-glyph">🍽️</div>
-      <div class="limit-title">You've been busy dining!</div>
-      <div class="limit-sub">
-        You've hit your daily recommendation limit. TasteMind will be back
-        with fresh picks tomorrow — great taste takes time.
-      </div>
-      <div class="limit-pills">
-        <div class="limit-pill"><span class="limit-pill-icon">✦</span> 10 of 10 used</div>
-        <div class="limit-pill"><span class="limit-pill-icon">🕐</span> Resets at midnight</div>
-      </div>
-      <div class="limit-bar-wrap">
-        <div class="limit-bar"></div>
-      </div>
-      <div class="limit-reset">Come back tomorrow for more recommendations</div>
-    </div>
-  `;
+      <div class="state">
+        <p class="state-title">You've used today's recommendations</p>
+        <p class="state-sub">New ones are available after midnight. In the meantime, review a recent meal so tomorrow's picks are even better.</p>
+      </div>`;
   },
 
-  // ── RECOMMENDATIONS ───────
-  renderRecommendations: (data, onSave) => {
+  // ── RECOMMENDATIONS ───────────────────────────────
+  renderRecommendations: (data) => {
     const groups = data.options
+      .filter((option) => option.places && option.places.length > 0)
       .map((option) => {
-        if (!option.places || option.places.length === 0) return "";
         const cards = option.places
-          .map((p) => ui.restaurantCard(p, option.label, onSave))
+          .map((p) => ui.restaurantCard(p, option.label))
           .join("");
+        // `because` is filled in by the backend when a retrieved past review
+        // informed this option; the line only appears when there is one.
+        const memory = option.because
+          ? `<p class="memory">${ICONS.memory}<span>${ui.esc(option.because)}</span></p>`
+          : "";
+        // Each cuisine gets its own steel rail with tickets hanging from it
         return `
-        <div class="rec-group">
-          <div class="rec-group-header">
-            <div class="rec-cuisine">${option.label}</div>
-          </div>
-          <div class="cards-row">${cards}</div>
-        </div>
-      `;
+          <section class="group">
+            <h3 class="group-title">${ui.esc(option.label)}</h3>
+            ${memory}
+            <div class="rail" aria-hidden="true"></div>
+            <div class="cards">${cards}</div>
+          </section>`;
       })
       .join("");
 
     document.getElementById("main-content").innerHTML = `
-    <div class="ai-banner">
-      <div class="ai-icon">✦ AI</div>
-      <div class="ai-summary">${data.summary}</div>
-    </div>
-    <div class="vibe-header">${data.vibe}</div>
-    <div class="vibe-reason">${data.reason}</div>
-    ${groups}
-  `;
+      <div class="results-head">
+        <h2 class="results-title">${ui.esc(data.vibe)}</h2>
+        <p class="results-reason">${ui.esc(data.reason)}</p>
+      </div>
+      ${groups}`;
   },
 
   // ── RESTAURANT CARD ───────────────────────────────
-  restaurantCard: (p, cuisine, onSave) => {
+  restaurantCard: (p, cuisine) => {
     const price = ui.priceLevel(p.price_level);
-    const openBadge =
-      p.open_now === true
-        ? '<span class="meta-pill open">Open</span>'
-        : p.open_now === false
-          ? '<span class="meta-pill closed">Closed</span>'
-          : "";
 
     // Store restaurant data in memory, keyed by place_id
     restaurantStore.set(p.place_id, {
@@ -317,147 +330,73 @@ const ui = {
       address: p.address,
     });
 
+    // Printed like the details line on a kitchen ticket
+    const facts = [
+      p.rating
+        ? `<li>${p.rating} stars (${(p.total_ratings || 0).toLocaleString()})</li>`
+        : "",
+      price ? `<li>${price}</li>` : "",
+      p.open_now === true ? '<li class="open">Open now</li>' : "",
+      p.open_now === false ? '<li class="closed">Closed</li>' : "",
+    ].join("");
+
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=${encodeURIComponent(p.place_id)}`;
+
     return `
-    <div class="restaurant-card">
-      <div class="card-name">${p.name}</div>
-      <div class="card-address">${p.address || ""}</div>
-      <div class="card-meta">
-        ${
-          p.rating
-            ? `<span class="meta-pill rating">★ ${p.rating} (${p.total_ratings?.toLocaleString() || 0})</span>`
-            : ""
-        }
-        ${price ? `<span class="meta-pill">${price}</span>` : ""}
-        ${openBadge}
-      </div>
-      <div class="card-actions">
-        <button
-          class="card-save-btn"
-          data-place-id="${p.place_id}"
-        >
-          I'm going here →
-        </button>
-      </div>
-    </div>
-  `;
+      <article class="card ticket">
+        <span class="clip" aria-hidden="true"></span>
+        <h4 class="card-name">${ui.esc(p.name)}</h4>
+        <p class="card-address">${ui.esc(p.address || "")}</p>
+        ${facts ? `<ul class="facts">${facts}</ul>` : ""}
+        <div class="card-actions">
+          <button class="btn btn-primary card-save-btn" data-place-id="${ui.esc(p.place_id)}">I'm going here</button>
+          <a href="${mapsUrl}" target="_blank" rel="noopener">Directions</a>
+        </div>
+      </article>`;
   },
 
-  // ── RATING MODAL ──────────────────────────────────
+  // ── RATING MODAL (re-rating a past meal) ──────────
   renderRatingModal: (visit_id, name) => {
     document.getElementById("modal-container").innerHTML = `
       <div class="modal-overlay" id="modal-overlay">
-        <div class="modal">
-          <div class="modal-eyebrow">Rate your experience</div>
-          <div class="modal-title">${name}</div>
-          <div class="modal-sub">
-            How was your meal? This helps TasteMind learn your taste.
-          </div>
-
-          <div class="star-row" id="star-row">
-            ${[1, 2, 3, 4, 5]
-              .map((n) => `<span class="star" data-value="${n}">★</span>`)
-              .join("")}
-          </div>
-
-          <textarea
-            class="fancy-input"
-            id="rate-notes"
-            placeholder="Any notes? e.g. 'pasta was incredible, super cozy vibes'"
-            rows="3"
-            style="margin-top:4px"
-          ></textarea>
-
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <h2 class="modal-title" id="modal-title">${ui.esc(name)}</h2>
+          <p class="modal-sub">Changed your mind? A new rating replaces the old one.</p>
+          <div class="stars" id="star-row">${ui.starButtons("star")}</div>
+          <label class="visually-hidden" for="rate-notes">Notes</label>
+          <textarea class="field" id="rate-notes" rows="3"
+            placeholder="What stood out? e.g. the pasta was incredible"></textarea>
           <div class="modal-actions">
-            <button class="modal-cancel" id="modal-cancel-btn">Skip</button>
-            <button class="modal-confirm" id="modal-confirm-btn" disabled>
-              Save rating →
-            </button>
+            <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button class="btn btn-primary" id="modal-confirm-btn" disabled>Save rating</button>
           </div>
         </div>
-      </div>
-    `;
+      </div>`;
   },
 
-  // ── SIDEBAR TABS ──────────────────────────────────
-
-  renderLocation: (location) => {
-    const text = document.getElementById("location-text");
-    if (text) text.textContent = location || "No location set";
-  },
-
-  renderPendingList: (pending) => {
-    const list = document.getElementById("pending-list");
-    if (!list) return;
-    if (!pending || pending.length === 0) {
-      list.innerHTML = "";
-      return;
-    }
-    list.innerHTML = pending
-      .map(
-        (r) => `
-      <div class="pending-item history-item" data-place-id="${r.place_id}">
-        <div>
-          <div class="history-name">${r.restaurant_name}</div>
-          <div class="history-meta">${r.cuisine_type || "Restaurant"} · Tap to review</div>
-        </div>
-        <div class="pending-dot">●</div>
-      </div>
-    `,
-      )
-      .join("");
-  },
-
-  // ── REVIEW SLIP ───────────────────────────────────
-  renderReviewSlip: (restaurant) => {
-    document.getElementById("main-content").innerHTML = `
-      <div class="review-slip">
-        <div class="review-slip-eyebrow">Pending feedback</div>
-        <div class="review-slip-name">${restaurant.restaurant_name}</div>
-        <div class="review-slip-meta">${restaurant.cuisine_type || ""} ${restaurant.address ? "· " + restaurant.address : ""}</div>
-
-        <div class="review-section-label">How was your meal?</div>
-        <div class="star-row" id="review-star-row">
-          ${[1, 2, 3, 4, 5]
-            .map(
-              (n) =>
-                `<span class="star review-star" data-value="${n}">★</span>`,
-            )
-            .join("")}
-        </div>
-
-        <textarea
-          class="fancy-input"
-          id="review-notes"
-          placeholder="Any notes? e.g. 'broth was incredible, a bit loud though'"
-          rows="3"
-          style="margin-top: 12px"
-        ></textarea>
-
-        <div class="review-actions">
-          <button class="modal-cancel" id="review-cancel-btn">Cancel</button>
-          <button class="modal-confirm" id="review-submit-btn" disabled>
-            Submit review →
-          </button>
-        </div>
-      </div>
-    `;
-  },
-
-  // ── REVIEW STAR UPDATES ───────────────────────────
-  updateReviewStars: (n) => {
-    document.querySelectorAll(".review-star").forEach((s, i) => {
-      s.classList.toggle("active", i < n);
-    });
-  },
-
-  // ── STAR INTERACTIONS ─────────────────────────────
   updateStars: (n) => {
-    document.querySelectorAll(".star").forEach((s, i) => {
+    document.querySelectorAll(".star-btn.star").forEach((s, i) => {
       s.classList.toggle("active", i < n);
     });
   },
 
   closeModal: () => {
     document.getElementById("modal-container").innerHTML = "";
+  },
+
+  // ── DRAWER ────────────────────────────────────────
+  openDrawer: () => {
+    const drawer = document.getElementById("drawer");
+    drawer.classList.add("open");
+    drawer.setAttribute("aria-hidden", "false");
+    document.getElementById("drawer-scrim").hidden = false;
+    document.getElementById("drawer-close").focus();
+  },
+
+  closeDrawer: () => {
+    const drawer = document.getElementById("drawer");
+    drawer.classList.remove("open");
+    drawer.setAttribute("aria-hidden", "true");
+    document.getElementById("drawer-scrim").hidden = true;
   },
 };
