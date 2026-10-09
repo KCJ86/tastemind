@@ -15,13 +15,18 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/css/styles.css" />
+    <!-- Applies the saved theme before the page paints (no flash) -->
+    <script src="/js/theme.js"></script>
   </head>
   <body>
     <!-- HEADER -->
     <header class="topbar steel">
       <div class="topbar-inner">
         <a class="wordmark" href="/">TasteMind</a>
-        <div class="topbar-right" id="header-right"></div>
+        <div class="topbar-actions">
+          <button class="icon-btn theme-btn" id="theme-btn" aria-label="Theme"></button>
+          <div class="topbar-right" id="header-right"></div>
+        </div>
       </div>
     </header>
 
@@ -29,14 +34,14 @@
     <div class="screen active" id="screen-onboard">
       <section class="onboard">
         <h1 class="onboard-title">
-          Tell it what you're craving. It finds the place.
+          Tell it what you're craving. <strong>It finds the place.</strong>
         </h1>
         <p class="onboard-sub">
           TasteMind learns from every meal you rate, so each recommendation
           fits you a little better than the last.
         </p>
 
-        <div class="panel onboard-panel">
+        <div class="panel onboard-panel steel">
           <div class="field-group">
             <label class="visually-hidden" for="new-name">First name</label>
             <input
