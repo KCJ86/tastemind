@@ -142,6 +142,16 @@
           </div>
         </div>
 
+        <!-- Budget: none selected means any price. Pick one or several. -->
+        <div class="budget" role="group" aria-labelledby="budget-label">
+          <span class="budget-label" id="budget-label">Budget</span>
+          <button class="budget-btn" data-level="0" aria-pressed="true">Any</button>
+          <button class="budget-btn" data-level="1" aria-pressed="false" aria-label="Inexpensive">$</button>
+          <button class="budget-btn" data-level="2" aria-pressed="false" aria-label="Moderate">$$</button>
+          <button class="budget-btn" data-level="3" aria-pressed="false" aria-label="Expensive">$$$</button>
+          <button class="budget-btn" data-level="4" aria-pressed="false" aria-label="Very expensive">$$$$</button>
+        </div>
+
         <div class="location-edit" id="location-edit" style="display: none">
           <label class="visually-hidden" for="location-input">New location</label>
           <input

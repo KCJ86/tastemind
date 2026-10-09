@@ -8,9 +8,18 @@ const axios = require("axios");
 const PLACES_URL = "https://places.googleapis.com/v1/places:searchText";
 const DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json";
 
+// Our budget levels (1-4) mapped to Google's Places API (New) price levels
+const GOOGLE_PRICE_LEVELS = {
+  1: "PRICE_LEVEL_INEXPENSIVE",
+  2: "PRICE_LEVEL_MODERATE",
+  3: "PRICE_LEVEL_EXPENSIVE",
+  4: "PRICE_LEVEL_VERY_EXPENSIVE",
+};
+
+// priceLevels: array of 1-4 chosen by the user, or empty for any price
 const searchRestaurant = async (
   query,
-  priceRange,
+  priceLevels = [],
   radiusMiles = 10,
   coordinates = null,
 ) => {
@@ -21,6 +30,11 @@ const searchRestaurant = async (
     includedType: "restaurant",
     maxResultCount: 3,
   };
+
+  // Note: Google excludes places with no price data when this filter is set
+  if (priceLevels.length > 0) {
+    requestBody.priceLevels = priceLevels.map((n) => GOOGLE_PRICE_LEVELS[n]);
+  }
 
   if (coordinates) {
     requestBody.locationRestriction = {

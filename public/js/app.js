@@ -7,11 +7,14 @@ const state = {
   selectedRating: 0,
   pendingRateVisit: null,
   searchRadius: 10,
+  priceLevels: loadBudget(), // [] means any price
 };
 
 // ── INIT ───────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
   bindStaticEvents();
+  renderBudget();
+  paintRadius();
   const savedCode = localStorage.getItem("tm_user_code");
   if (savedCode) fetchAndEnterApp(savedCode);
 });
@@ -31,6 +34,7 @@ function bindStaticEvents() {
     const val = e.target.value;
     document.getElementById("radius-value").textContent = `${val} miles`;
     state.searchRadius = parseInt(val);
+    paintRadius();
   });
   document
     .getElementById("ask-btn")
@@ -52,6 +56,22 @@ document.addEventListener("click", (e) => {
   }
   if (e.target.closest("#drawer-close") || e.target.id === "drawer-scrim") {
     ui.closeDrawer();
+    return;
+  }
+
+  // Budget buttons — "Any" clears; a $ level toggles on or off
+  const budgetBtn = e.target.closest(".budget-btn");
+  if (budgetBtn) {
+    const level = parseInt(budgetBtn.dataset.level);
+    if (level === 0) {
+      state.priceLevels = [];
+    } else if (state.priceLevels.includes(level)) {
+      state.priceLevels = state.priceLevels.filter((l) => l !== level);
+    } else {
+      state.priceLevels = [...state.priceLevels, level].sort();
+    }
+    saveBudget();
+    renderBudget();
     return;
   }
 
@@ -451,6 +471,7 @@ async function handleGetRecommendations() {
       craving,
       null,
       state.searchRadius,
+      state.priceLevels,
     );
     clearInterval(stepInterval);
 
@@ -620,4 +641,45 @@ function scrollToResults() {
   document
     .getElementById("main-content")
     .scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+}
+
+// ── BUDGET ─────────────────────────────────────────
+// Remembered on this device so users don't re-pick it every search.
+function loadBudget() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("tm_budget") || "[]");
+    return Array.isArray(saved)
+      ? saved.filter((n) => Number.isInteger(n) && n >= 1 && n <= 4)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveBudget() {
+  try {
+    localStorage.setItem("tm_budget", JSON.stringify(state.priceLevels));
+  } catch {
+    /* not critical */
+  }
+}
+
+function renderBudget() {
+  document.querySelectorAll(".budget-btn").forEach((btn) => {
+    const level = parseInt(btn.dataset.level);
+    const on =
+      level === 0
+        ? state.priceLevels.length === 0
+        : state.priceLevels.includes(level);
+    btn.setAttribute("aria-pressed", String(on));
+  });
+}
+
+// ── RADIUS SLIDER ──────────────────────────────────
+// Fills the track up to the thumb so the current value is easy to see.
+function paintRadius() {
+  const slider = document.getElementById("radius-slider");
+  const pct =
+    ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+  slider.style.setProperty("--pct", `${pct}%`);
 }

@@ -55,11 +55,18 @@ const api = {
     craving,
     location = null,
     radius = 10,
+    priceLevels = [],
   ) => {
     const res = await fetch(`${API_BASE}/recommendations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_code, craving, location, radius }),
+      body: JSON.stringify({
+        user_code,
+        craving,
+        location,
+        radius,
+        price_levels: priceLevels,
+      }),
     });
     return res.json();
   },

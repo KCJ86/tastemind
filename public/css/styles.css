@@ -688,9 +688,96 @@ textarea.field {
   gap: 10px;
 }
 
+/* Custom slider: a visible track that fills with the accent up to the
+   thumb. --pct is set from app.js as the value changes. */
 .radius input {
-  width: 120px;
-  accent-color: var(--accent);
+  --pct: 18%;
+  width: 140px;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.radius input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--pct),
+    var(--steel-edge) var(--pct) 100%
+  );
+}
+
+.radius input::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--steel-edge);
+}
+
+.radius input::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.radius input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px; /* centers the thumb on the 4px track */
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid var(--steel-edge);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.radius input::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid var(--steel-edge);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ── BUDGET ────────────────────────────────────── */
+.budget {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--fs-footnote);
+  color: var(--text-2);
+}
+
+.budget-label {
+  margin-right: 4px;
+}
+
+.budget-btn {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--separator);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.budget-btn:hover {
+  background: var(--fill);
+}
+
+.budget-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 #radius-value {

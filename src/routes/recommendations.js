@@ -30,6 +30,9 @@ router.post(
       .notEmpty()
       .withMessage("Tell us what you are craving!"),
     body("location").optional().trim(),
+    // Budget for this search: e.g. [1, 2] for $ to $$. Empty or missing = any.
+    body("price_levels").optional().isArray({ max: 4 }),
+    body("price_levels.*").isInt({ min: 1, max: 4 }).toInt(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -38,6 +41,7 @@ router.post(
     }
     try {
       const { user_code, craving, location, radius } = req.body;
+      const priceLevels = [...new Set(req.body.price_levels || [])].sort();
 
       const user = await getUserByCode(user_code);
       if (!user) return res.status(404).json({ error: "User not found" });
@@ -65,6 +69,7 @@ router.post(
         visitContext,
         craving,
         location,
+        priceLevels,
       );
 
       const locationStr = location || user.location;
@@ -79,7 +84,7 @@ router.post(
         claudeResponse.options.map(async (option) => {
           const places = await searchRestaurant(
             option.search_query,
-            claudeResponse.price_range,
+            priceLevels,
             radius || 10,
             coordinates,
           );
