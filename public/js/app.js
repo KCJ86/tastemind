@@ -234,7 +234,7 @@ function initLocation() {
     .getElementById("location-edit-btn")
     ?.addEventListener("click", () => {
       document.getElementById("location-display").style.display = "none";
-      document.getElementById("location-edit").style.display = "block";
+      document.getElementById("location-edit").style.display = "flex"; // flex, so the CSS gap spaces the field and buttons
       const input = document.getElementById("location-input");
       input.value = user.location || "";
       input.focus();
@@ -265,6 +265,12 @@ function closeLocationEdit() {
   document.getElementById("location-edit").style.display = "none";
   document.getElementById("location-resolved").style.display = "none";
   document.getElementById("location-resolved").textContent = "";
+
+  // Reset the button so the panel is fresh the next time it opens,
+  // however it was closed (saved, cancelled, or Escape)
+  const btn = document.getElementById("location-save-btn");
+  btn.disabled = false;
+  btn.textContent = "Update location";
 }
 
 async function handleSaveLocation() {

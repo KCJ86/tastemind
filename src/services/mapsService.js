@@ -16,6 +16,21 @@ const GOOGLE_PRICE_LEVELS = {
   4: "PRICE_LEVEL_VERY_EXPENSIVE",
 };
 
+// Straight-line distance in miles between two { latitude, longitude } points
+// (haversine formula). Good enough for "0.8 mi away"; not driving distance.
+const milesBetween = (a, b) => {
+  const toRad = (d) => (d * Math.PI) / 180;
+  const R = 3958.8; // Earth's radius in miles
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) *
+      Math.cos(toRad(b.latitude)) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
 // priceLevels: array of 1-4 chosen by the user, or empty for any price
 const searchRestaurant = async (
   query,
@@ -57,18 +72,25 @@ const searchRestaurant = async (
         "Content-Type": "application/json",
         "X-Goog-Api-Key": process.env.GOOGLE_MAPS_API_KEY,
         "X-Goog-FieldMask":
-          "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.location",
+          "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.regularOpeningHours,places.location,places.websiteUri,places.nationalPhoneNumber",
       },
     });
 
-    console.log("🗺️ Raw response:", JSON.stringify(response.data, null, 2));
-    console.log("🗺️ Request body sent:", JSON.stringify(requestBody, null, 2));
 
     const results = response.data.places || [];
     return results.map((p) => ({
       place_id: p.id,
       name: p.displayName?.text,
       address: p.formattedAddress,
+      short_address: p.shortFormattedAddress || p.formattedAddress,
+      distance_miles:
+        coordinates && p.location
+          ? Math.round(milesBetween(coordinates, p.location) * 10) / 10
+          : null,
+      website: p.websiteUri || null,
+      phone: p.nationalPhoneNumber || null,
+      // Seven strings, Monday first: "Monday: 10:00 AM – 10:00 PM"
+      hours: p.regularOpeningHours?.weekdayDescriptions || [],
       rating: p.rating,
       total_ratings: p.userRatingCount,
       price_level: p.priceLevel,

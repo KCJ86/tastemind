@@ -16,8 +16,7 @@
 
   /* Steel: a brushed finish built from fine vertical lines over a soft
      top-to-bottom sheen. Used on the top bar, search bar, prompt, and rails. */
-  --steel:
-    repeating-linear-gradient(
+  --steel: repeating-linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.1) 0 1px,
       rgba(0, 0, 0, 0.035) 1px 2px,
@@ -44,8 +43,7 @@
   --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05);
   --shadow-3: 0 20px 60px rgba(0, 0, 0, 0.18);
 
-  --font:
-    "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+  --font: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
     sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   --fs-hero: clamp(36px, 6vw, 56px);
@@ -81,8 +79,7 @@
     --text-2: #a1a1a6;
 
     /* Blackened steel */
-    --steel:
-      repeating-linear-gradient(
+    --steel: repeating-linear-gradient(
         90deg,
         rgba(255, 255, 255, 0.045) 0 1px,
         rgba(0, 0, 0, 0.12) 1px 2px,
@@ -124,8 +121,7 @@
   --text-2: #a1a1a6;
 
   /* Blackened steel */
-  --steel:
-    repeating-linear-gradient(
+  --steel: repeating-linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.045) 0 1px,
       rgba(0, 0, 0, 0.12) 1px 2px,
@@ -320,9 +316,7 @@ svg {
   border-radius: var(--radius);
   background: var(--fill);
   outline: none;
-  transition:
-    border-color 0.2s var(--ease),
-    background 0.2s var(--ease);
+  transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
 }
 
 .field:focus {
@@ -868,9 +862,7 @@ textarea.field {
   display: grid;
   place-items: center;
   color: var(--text-2);
-  transition:
-    color 0.15s var(--ease),
-    transform 0.15s var(--ease);
+  transition: color 0.15s var(--ease), transform 0.15s var(--ease);
 }
 
 .star-btn svg {
@@ -1096,9 +1088,7 @@ textarea.field {
   box-shadow: var(--shadow-3);
   transform: translateX(100%);
   visibility: hidden;
-  transition:
-    transform 0.35s var(--ease),
-    visibility 0s linear 0.35s;
+  transition: transform 0.35s var(--ease), visibility 0s linear 0.35s;
 }
 
 .drawer.open {
@@ -1260,9 +1250,7 @@ textarea.field {
   opacity: 0;
   transform: translate(-50%, 12px);
   pointer-events: none;
-  transition:
-    opacity 0.25s var(--ease),
-    transform 0.25s var(--ease);
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
 }
 
 .toast.show {
@@ -1309,9 +1297,7 @@ textarea.field {
   border-radius: 16px;
   padding: 8px 8px 8px 22px;
   border: 1px solid var(--steel-edge);
-  box-shadow:
-    inset 0 1px 0 var(--steel-shine),
-    0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 0 var(--steel-shine), 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .search-bar.steel:focus-within {
@@ -1352,15 +1338,14 @@ textarea.field {
   border-radius: 8px;
   border: 1px solid var(--steel-edge);
   background: var(--steel);
-  box-shadow:
-    inset 0 1px 0 var(--steel-shine),
-    0 4px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: inset 0 1px 0 var(--steel-shine), 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 .group .cards {
   margin-top: -22px; /* group gap is 16px; this tucks tickets under the rail */
   padding: 0 12px;
   gap: 24px;
+  align-items: start; /* opening one ticket shouldn't stretch its neighbor */
 }
 
 /* A ticket always sits on paper, so it pins its own colors and keeps the
@@ -1381,9 +1366,7 @@ textarea.field {
   background: var(--paper);
   color: var(--text);
   border-radius: 0;
-  box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.12),
-    0 1px 0 rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12), 0 1px 0 rgba(0, 0, 0, 0.06);
 }
 
 /* Torn bottom edge */
@@ -1394,11 +1377,7 @@ textarea.field {
   right: 0;
   bottom: -8px;
   height: 8px;
-  background: radial-gradient(
-      circle at 6px 0,
-      var(--paper) 5.5px,
-      transparent 6px
-    )
+  background: radial-gradient(circle at 6px 0, var(--paper) 5.5px, transparent 6px)
     0 0 / 12px 8px repeat-x;
 }
 
@@ -1443,6 +1422,73 @@ textarea.field {
   border-radius: 10px;
 }
 
+/* ── TICKET DETAILS (tear-off) ─────────────────── */
+.ticket-more {
+  margin-top: 4px;
+  font-size: var(--fs-footnote);
+}
+
+.ticket-more summary {
+  width: fit-content;
+  padding: 6px 0;
+  list-style: none;
+  color: var(--text-2);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ticket-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.ticket-more summary::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-3px) rotate(45deg);
+  transition: transform 0.2s var(--ease);
+}
+
+.ticket-more[open] summary::after {
+  transform: translateY(0) rotate(-135deg);
+}
+
+.ticket-more summary:hover {
+  color: var(--text);
+}
+
+/* Dashed tear line, like the perforation on a real ticket */
+.ticket-facts {
+  margin: 8px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed #b9bdc0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ticket-facts div {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+}
+
+.ticket-facts dt {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.ticket-facts dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .memory {
   border-radius: 10px;
 }
@@ -1476,9 +1522,7 @@ textarea.field {
 .onboard-panel.steel {
   border: 1px solid var(--steel-edge);
   border-radius: 18px;
-  box-shadow:
-    inset 0 1px 0 var(--steel-shine),
-    0 10px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 0 var(--steel-shine), 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .onboard-panel.steel .field {

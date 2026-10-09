@@ -342,17 +342,69 @@ const ui = {
 
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name)}&query_place_id=${encodeURIComponent(p.place_id)}`;
 
+    // "699 Valencia St · 0.8 mi" instead of the full postal address
+    const where = [
+      p.short_address || p.address,
+      p.distance_miles != null ? `${p.distance_miles} mi` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     return `
       <article class="card ticket">
         <span class="clip" aria-hidden="true"></span>
         <h4 class="card-name">${ui.esc(p.name)}</h4>
-        <p class="card-address">${ui.esc(p.address || "")}</p>
+        <p class="card-address">${ui.esc(where)}</p>
         ${facts ? `<ul class="facts">${facts}</ul>` : ""}
         <div class="card-actions">
           <button class="btn btn-primary card-save-btn" data-place-id="${ui.esc(p.place_id)}">I'm going here</button>
           <a href="${mapsUrl}" target="_blank" rel="noopener">Directions</a>
         </div>
+        ${ui.ticketDetails(p)}
       </article>`;
+  },
+
+  // Today's hours: Google lists the week Monday-first, JS counts Sunday as 0
+  todayHours: (hours) => {
+    if (!hours || hours.length !== 7) return "";
+    const line = hours[(new Date().getDay() + 6) % 7] || "";
+    return line.replace(/^[^:]+:\s*/, ""); // drop the "Monday: " prefix
+  },
+
+  // Only allow real web links from outside data into an href
+  safeUrl: (url) => {
+    try {
+      const u = new URL(url);
+      return u.protocol === "https:" || u.protocol === "http:" ? u.href : "";
+    } catch {
+      return "";
+    }
+  },
+
+  // The tear-off bottom of the ticket. A native <details> element opens and
+  // closes on its own and works with the keyboard and screen readers.
+  ticketDetails: (p) => {
+    const today = ui.todayHours(p.hours);
+    const site = ui.safeUrl(p.website);
+    const phone = p.phone ? String(p.phone) : "";
+    const tel = phone.replace(/[^\d+]/g, "");
+
+    const rows = [
+      today ? `<div><dt>Today</dt><dd>${ui.esc(today)}</dd></div>` : "",
+      site
+        ? `<div><dt>Website</dt><dd><a href="${ui.esc(site)}" target="_blank" rel="noopener">${ui.esc(new URL(site).hostname.replace(/^www\./, ""))}</a></dd></div>`
+        : "",
+      phone
+        ? `<div><dt>Phone</dt><dd><a href="tel:${ui.esc(tel)}">${ui.esc(phone)}</a></dd></div>`
+        : "",
+    ].join("");
+
+    if (!rows) return "";
+    return `
+      <details class="ticket-more">
+        <summary>More details</summary>
+        <dl class="ticket-facts">${rows}</dl>
+      </details>`;
   },
 
   // ── RATING MODAL (re-rating a past meal) ──────────
