@@ -7,6 +7,12 @@ node_modules/
 # Database file — this has real ppl data dont mess wid it 
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
 
 # OS junk
 .DS_Store
