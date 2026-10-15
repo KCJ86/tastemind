@@ -55,6 +55,13 @@ const ui = {
       )
       .join(""),
 
+  // Read-only stars for history, matching the star buttons used to rate.
+  // The label carries the number so screen readers still hear "4 out of 5".
+  starDisplay: (n) =>
+    `<span class="item-stars" role="img" aria-label="${n} out of 5 stars">${[1, 2, 3, 4, 5]
+      .map((i) => `<span class="${i <= n ? "on" : ""}">${ICONS.star}</span>`)
+      .join("")}</span>`,
+
   priceLevel: (level) => {
     const map = {
       PRICE_LEVEL_INEXPENSIVE: "$",
@@ -168,7 +175,7 @@ const ui = {
             <span class="item-name">${ui.esc(v.restaurant_name)}</span><br />
             <span class="item-meta">${ui.esc(v.cuisine_type || "Restaurant")}, ${new Date(v.visited_at).toLocaleDateString()}</span>
           </span>
-          <span class="item-rating">${v.rating ? `${v.rating} of 5` : "Not rated"}</span>
+          ${v.rating ? ui.starDisplay(v.rating) : '<span class="item-rating">Not rated</span>'}
         </button>`,
       )
       .join("");

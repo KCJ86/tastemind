@@ -62,7 +62,6 @@ Always respond with valid JSON only — no markdown, no preamble, no explanation
 
   const userPrompt = `Here is everything you know about this user:
 
-Name: ${user.name}
 Location: ${location || user.location}
 Budget for this search: ${budget}
 Liked cuisines: ${liked.length > 0 ? liked.join(", ") : "not set yet"}
@@ -78,6 +77,8 @@ Based on all of this, identify ONE dining vibe or experience that best matches t
 Then generate exactly 3 different restaurant options that each express that vibe differently —
 different cuisines, different styles, or different takes on the same feeling.
 Respect their budget exactly. If they didn't set one, don't assume or mention a price range.
+Use their history to choose well, but don't quote it back: the "reason" must not mention their name,
+past restaurants, reviews, or ratings.
 
 CRITICAL search_query rules:
 - Keep each search_query to 2-4 words MAX — short queries work best with Google Places
@@ -90,7 +91,7 @@ Respond ONLY with this JSON shape:
 {
   "summary": "one sentence describing what you understood about their mood/craving",
   "vibe": "Short Vibe Name",
-  "reason": "personalized reason referencing their history and why this vibe fits",
+  "reason": "ONE short sentence (under 25 words) speaking directly to the user as 'you', saying plainly what this vibe offers them right now",
   "options": [
     {
       "label": "Vietnamese Pho",

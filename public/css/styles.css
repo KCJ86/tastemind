@@ -1162,6 +1162,27 @@ textarea.field {
   color: var(--text-2);
 }
 
+.item-stars {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  color: var(--text-2);
+}
+
+.item-stars svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.8;
+}
+
+.item-stars .on {
+  color: var(--accent);
+}
+
+.item-stars .on svg {
+  fill: currentColor;
+}
+
 .item-rating {
   flex-shrink: 0;
   font-size: var(--fs-footnote);
