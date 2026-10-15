@@ -31,9 +31,14 @@ const createUser = async (name, location) => {
   }
 };
 
+// Never SELECT u.* for anything sent to the client — it would include
+// password_hash. Add new user columns here deliberately.
+const PUBLIC_USER_COLUMNS = `u.id, u.name, u.username, u.email, u.user_code,
+            u.location, u.created_at`;
+
 const getUserById = async (id) => {
   const result = await pool.query(
-    `SELECT u.*, tp.liked_cuisines, tp.disliked_cuisines,
+    `SELECT ${PUBLIC_USER_COLUMNS}, tp.liked_cuisines, tp.disliked_cuisines,
             tp.preferred_price_range, tp.dietary_restrictions
      FROM users u
      LEFT JOIN taste_profiles tp ON tp.user_id = u.id
@@ -45,7 +50,7 @@ const getUserById = async (id) => {
 
 const getUserByCode = async (user_code) => {
   const result = await pool.query(
-    `SELECT u.*, tp.liked_cuisines, tp.disliked_cuisines,
+    `SELECT ${PUBLIC_USER_COLUMNS}, tp.liked_cuisines, tp.disliked_cuisines,
             tp.preferred_price_range, tp.dietary_restrictions
      FROM users u
      LEFT JOIN taste_profiles tp ON tp.user_id = u.id
