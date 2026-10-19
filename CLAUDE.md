@@ -24,6 +24,15 @@ conda run -n tastemind-pg psql -h ~/pgdata/tastemind -p 5433 -U postgres -d tast
 
 Databases: `tastemind_dev` (`DATABASE_URL`, restored from a production backup, so it holds real user data) and `tastemind_test` (`TEST_DATABASE_URL`, wiped by tests). Both are owned by the non-superuser role `tastemind`; the `vector` extension was pre-created by `postgres` because `tastemind` can't create it. The `.env` file has no Railway URLs. Never point `DATABASE_URL` or `TEST_DATABASE_URL` at Railway when running locally.
 
+### Tests
+
+```bash
+npm test                                                        # all tests (node:test + supertest), serially
+node --test --test-name-pattern="logout" tests/auth.test.js     # one test by name
+```
+
+Tests need the local database running and wipe `TEST_DATABASE_URL` before each test. `tests/helpers.js` refuses to run unless that URL is on localhost and the database name ends in `_test`, and it must be required before anything in `src/`. Tests import `src/app.js`, which builds the app without listening; `src/index.js` runs migrations and starts the server. Rate limiters store counts in memory for the whole test file and key on `X-Forwarded-For` (because of `trust proxy`). Use `nextIp()` and a username no other test uses whenever a test makes failed logins.
+
 There is no linter or build step. The frontend is plain static files served by Express, so frontend edits need only a browser refresh.
 
 Required env (see `.env.example`): `ANTHROPIC_API_KEY`, `GOOGLE_MAPS_API_KEY` (Places API (New) + Geocoding), `DATABASE_URL` (PostgreSQL). Optional: `VOYAGE_API_KEY` (embeddings for RAG), `CLAUDE_MODEL` (overrides the default in `claudeService.js`), `DATABASE_SSL=true` (needed for Railway's public URL), `FRONTEND_URL` (CORS origin).
