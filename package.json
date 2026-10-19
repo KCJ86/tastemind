@@ -6,7 +6,8 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "backfill:embeddings": "node scripts/backfill-embeddings.js",
-    "test": "node --test --test-concurrency=1 'tests/**/*.test.js'"
+    "test": "node --test --test-concurrency=1 'tests/**/*.test.js'",
+    "db:reset-users": "node scripts/reset-users.js"
   },
   "keywords": [],
   "author": "",

@@ -1547,7 +1547,7 @@ textarea.field {
 /* A segmented control set into the steel panel */
 .auth-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 4px;
   padding: 4px;
   border-radius: 13px;
@@ -1591,16 +1591,6 @@ textarea.field {
 
 .auth-form .btn {
   margin-top: 4px;
-}
-
-.auth-note {
-  font-size: var(--fs-callout);
-  color: var(--on-steel-2);
-}
-
-.mono {
-  font-family: var(--mono);
-  font-size: 0.92em;
 }
 
 .field-wrap {

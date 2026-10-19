@@ -9,7 +9,6 @@ const {
   get,
   sessionCookie,
   signup,
-  createLegacyUser,
   PASSWORD,
 } = require("./helpers");
 
@@ -36,6 +35,7 @@ describe("signup", () => {
     assert.equal(res.body.user.username, "kennedy_j");
     assert.equal(res.body.user.email, "kennedy@example.com");
     assert.equal("password_hash" in res.body.user, false);
+    assert.equal("user_code" in res.body.user, false);
 
     const raw = res.headers["set-cookie"].find((c) => c.startsWith("tm_session="));
     assert.match(raw, /HttpOnly/);
@@ -102,15 +102,6 @@ describe("login", () => {
     assert.equal(sessionCookie(wrongPassword), null);
   });
 
-  test("an unclaimed legacy account can't log in", async () => {
-    await createLegacyUser("legacy_ab12");
-    const res = await post("/api/v1/auth/login", {
-      username: "legacy_ab12",
-      password: PASSWORD,
-    });
-    assert.equal(res.status, 401);
-  });
-
   test("locks a username after 5 failures, even from different IPs", async () => {
     await signup({ username: "lockme" });
     for (let i = 0; i < 5; i++) {
@@ -171,82 +162,24 @@ describe("logout", () => {
   });
 });
 
-describe("claim", () => {
-  const claim = (body, ip) =>
-    post(
-      "/api/v1/auth/claim",
-      { username: "claimer", password: PASSWORD, ...body },
-      ip,
-    );
-
-  test("upgrades a legacy account in place and signs the user in", async () => {
-    const id = await createLegacyUser("elise_ab12", "Elise");
-    const res = await claim({ user_code: "elise_ab12" });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.user.id, id); // same account, so history is kept
-    assert.equal(res.body.user.username, "claimer");
-    assert.equal(res.body.user.user_code, null);
-    assert.equal((await get("/api/v1/auth/me", sessionCookie(res))).status, 200);
-
-    const login = await post("/api/v1/auth/login", {
+describe("removed: sign-in codes and claiming", () => {
+  test("POST /auth/claim no longer exists", async () => {
+    const res = await post("/api/v1/auth/claim", {
+      user_code: "elise_ab12",
       username: "claimer",
       password: PASSWORD,
     });
-    assert.equal(login.status, 200);
+    assert.equal(res.status, 404);
   });
 
-  test("a claimed code can't be reused", async () => {
-    await createLegacyUser("elise_ab12");
-    assert.equal((await claim({ user_code: "elise_ab12" })).status, 200);
-
-    const again = await claim({ user_code: "elise_ab12", username: "attacker" });
-    assert.equal(again.status, 401);
-    assert.equal(sessionCookie(again), null);
-
-    // The original owner's credentials are untouched.
+  test("users have no user_code or claimed_at column and there's no app_settings table", async () => {
     const { rows } = await pool.query(
-      "SELECT username FROM users WHERE username IS NOT NULL",
+      `SELECT
+         EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name = 'users' AND column_name IN ('user_code', 'claimed_at')) AS old_columns,
+         to_regclass('app_settings') IS NOT NULL AS app_settings`,
     );
-    assert.deepEqual(rows, [{ username: "claimer" }]);
-  });
-
-  test("an unknown code gets the same 401 as a reused one", async () => {
-    await createLegacyUser("elise_ab12");
-    await claim({ user_code: "elise_ab12" });
-    const reused = await claim({ user_code: "elise_ab12", username: "attacker" });
-    const unknown = await claim({ user_code: "nobody_0000", username: "attacker" });
-    assert.equal(unknown.status, 401);
-    assert.deepEqual(unknown.body, reused.body);
-  });
-
-  test("a taken username gives the same 409 whether or not the code is valid", async () => {
-    await signup({ username: "taken" });
-    await createLegacyUser("elise_ab12");
-    const valid = await claim({ user_code: "elise_ab12", username: "taken" });
-    const invalid = await claim({ user_code: "nobody_0000", username: "taken" });
-    assert.equal(valid.status, 409);
-    assert.deepEqual(valid.body, invalid.body);
-
-    // The valid code was not consumed by the failed attempt.
-    assert.equal((await claim({ user_code: "elise_ab12" })).status, 200);
-  });
-
-  test("is closed 30 days after the window opened", async () => {
-    await createLegacyUser("elise_ab12");
-    await pool.query(
-      `UPDATE app_settings SET value = (NOW() - INTERVAL '31 days')::text
-       WHERE key = 'claim_opens_at'`,
-    );
-    const res = await claim({ user_code: "elise_ab12" });
-    assert.equal(res.status, 410);
-  });
-
-  test("allows 5 attempts per IP per hour", async () => {
-    const ip = nextIp();
-    for (let i = 0; i < 5; i++) {
-      assert.equal((await claim({ user_code: `guess_${i}` }, ip)).status, 401);
-    }
-    assert.equal((await claim({ user_code: "guess_5" }, ip)).status, 429);
+    assert.deepEqual(rows[0], { old_columns: false, app_settings: false });
   });
 });
 

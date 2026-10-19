@@ -49,8 +49,6 @@
               aria-controls="form-signin" aria-selected="true">Sign in</button>
             <button class="auth-tab" type="button" role="tab" id="tab-signup"
               aria-controls="form-signup" aria-selected="false" tabindex="-1">Create account</button>
-            <button class="auth-tab" type="button" role="tab" id="tab-claim"
-              aria-controls="form-claim" aria-selected="false" tabindex="-1">I have an old code</button>
           </div>
 
           <!-- Real <form>s with submit buttons and autocomplete hints, so
@@ -124,49 +122,6 @@
             <button class="btn btn-primary btn-block" type="submit">Create account</button>
           </form>
 
-          <form class="auth-form" id="form-claim" role="tabpanel"
-            aria-labelledby="tab-claim" novalidate hidden>
-            <p class="auth-note">
-              Used TasteMind with a code like <span class="mono">kennedy_cd64</span>?
-              Enter it once and choose a username and password. Your meals and
-              reviews come with you.
-            </p>
-            <p class="form-error" role="alert" hidden></p>
-            <div class="field-wrap">
-              <label class="field-label" for="claim-code">Old code</label>
-              <input class="field mono" type="text" id="claim-code" name="user_code"
-                autocomplete="off" autocapitalize="none" autocorrect="off"
-                spellcheck="false" required />
-              <p class="field-error" id="claim-user_code-error" hidden></p>
-            </div>
-            <div class="field-wrap">
-              <label class="field-label" for="claim-username">Choose a username</label>
-              <input class="field" type="text" id="claim-username" name="username"
-                autocomplete="username" autocapitalize="none" autocorrect="off"
-                spellcheck="false" maxlength="30" aria-describedby="claim-username-hint" required />
-              <p class="field-hint" id="claim-username-hint">3 to 30 letters, numbers, underscores or dots</p>
-              <p class="field-error" id="claim-username-error" hidden></p>
-            </div>
-            <div class="field-wrap">
-              <label class="field-label" for="claim-password">Choose a password</label>
-              <div class="password-wrap">
-                <input class="field" type="password" id="claim-password" name="password"
-                  autocomplete="new-password" minlength="10"
-                  aria-describedby="claim-password-hint" required />
-                <button class="reveal-btn" type="button" aria-controls="claim-password"
-                  aria-pressed="false" aria-label="Show password"></button>
-              </div>
-              <p class="field-hint" id="claim-password-hint">At least 10 characters</p>
-              <p class="field-error" id="claim-password-error" hidden></p>
-            </div>
-            <div class="field-wrap">
-              <label class="field-label" for="claim-email">Email <span class="optional">(optional)</span></label>
-              <input class="field" type="email" id="claim-email" name="email"
-                autocomplete="email" autocapitalize="none" spellcheck="false" />
-              <p class="field-error" id="claim-email-error" hidden></p>
-            </div>
-            <button class="btn btn-primary btn-block" type="submit">Claim my account</button>
-          </form>
         </div>
       </section>
     </div>

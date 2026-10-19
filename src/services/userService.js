@@ -7,7 +7,7 @@ const { pool } = require("../db/database");
 
 // Never SELECT u.* for anything sent to the client — it would include
 // password_hash. Add new user columns here deliberately.
-const PUBLIC_USER_COLUMNS = `u.id, u.name, u.username, u.email, u.user_code,
+const PUBLIC_USER_COLUMNS = `u.id, u.name, u.username, u.email,
             u.location, u.created_at`;
 
 const getUserById = async (id) => {
@@ -81,8 +81,8 @@ const saveVisit = async (user_id, restaurant) => {
 };
 
 // Only inserts if the visit belongs to this user. Returns false otherwise.
-// (Previously any user_code could rate any visit_id — and with RAG, that text
-// would be embedded into the visit OWNER's retrieval context.)
+// Without this check, a review written by one user would be embedded into
+// the visit owner's RAG context.
 const saveRating = async (visit_id, user_id, rating, notes) => {
   const result = await pool.query(
     `INSERT INTO ratings (visit_id, user_id, rating, notes)

@@ -7,7 +7,6 @@ const {
   nextIp,
   send,
   signup,
-  createLegacyUser,
 } = require("./helpers");
 
 before(async () => {
@@ -95,12 +94,11 @@ describe("visit isolation between users", () => {
   });
 
   test("a user can't save a visit into another user's account", async () => {
-    // Old clients sent user_code / user_id in the body; both must be ignored.
+    // A user_id in the body must be ignored; only the session decides.
     const res = await send("post", "/api/v1/recommendations/save", {
       cookie: alice.cookie,
       body: {
         ...restaurant("Sneaky Sushi"),
-        user_code: "bob",
         user_id: bob.user.id,
       },
     });
@@ -174,10 +172,9 @@ describe("routes require a session", () => {
   }
 });
 
-describe("old user_code routes are gone", () => {
+describe("old per-user routes are gone", () => {
   before(async () => {
     await resetDb();
-    await createLegacyUser("elise_ab12", "Elise");
   });
 
   const OLD_ROUTES = [
@@ -200,21 +197,6 @@ describe("old user_code routes are gone", () => {
       assert.equal(res.status, 404);
     });
   }
-
-  test("the legacy account was not touched by any of the above", async () => {
-    const { rows } = await pool.query(
-      `SELECT u.location, tp.liked_cuisines FROM users u
-       JOIN taste_profiles tp ON tp.user_id = u.id WHERE u.user_code = 'elise_ab12'`,
-    );
-    assert.deepEqual(rows, [{ location: "San Diego, CA", liked_cuisines: "[]" }]);
-  });
-
-  test("a code in the body of a recommendation request is ignored", async () => {
-    const res = await send("post", "/api/v1/recommendations/save", {
-      body: { ...restaurant("Code Only"), user_code: "elise_ab12" },
-    });
-    assert.equal(res.status, 401);
-  });
 });
 
 describe("AI rate limit is per user", () => {

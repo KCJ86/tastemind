@@ -51,7 +51,6 @@ const resetDb = async () => {
     TRUNCATE users, taste_profiles, visits, ratings, recommendation_logs,
              reservations, sessions
       CASCADE;
-    UPDATE app_settings SET value = NOW()::text WHERE key = 'claim_opens_at';
   `);
 };
 
@@ -103,18 +102,6 @@ const signup = async (overrides = {}) => {
   return { user: res.body.user, cookie: sessionCookie(res) };
 };
 
-// A pre-accounts user: has a user_code, no username or password.
-const createLegacyUser = async (userCode, name = "Legacy") => {
-  const result = await pool.query(
-    `INSERT INTO users (name, user_code, location) VALUES ($1, $2, 'San Diego, CA')
-     RETURNING id`,
-    [name, userCode],
-  );
-  const id = result.rows[0].id;
-  await pool.query(`INSERT INTO taste_profiles (user_id) VALUES ($1)`, [id]);
-  return id;
-};
-
 module.exports = {
   app,
   pool,
@@ -126,6 +113,5 @@ module.exports = {
   send,
   sessionCookie,
   signup,
-  createLegacyUser,
   PASSWORD,
 };

@@ -18,7 +18,6 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        user_code TEXT UNIQUE NOT NULL,
         location TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -84,17 +83,17 @@ const initDb = async () => {
 };
 
 // ─── Accounts + sessions ───────────────────────────────
-// Users used to be identified only by user_code. These columns turn them into
-// real accounts; pre-existing users claim theirs once with their old code,
-// after which user_code is set to NULL so it can't be used again.
 const initAuth = async () => {
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;              -- optional, for recovery later
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMP;
-    ALTER TABLE users ALTER COLUMN user_code DROP NOT NULL;             -- new accounts get no code
+
+    -- Left over from sign-in codes and the claim flow, both removed.
+    ALTER TABLE users DROP COLUMN IF EXISTS user_code;
+    ALTER TABLE users DROP COLUMN IF EXISTS claimed_at;
+    DROP TABLE IF EXISTS app_settings;
 
     -- Case-insensitive uniqueness: "Kennedy" and "kennedy" are the same account.
     CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower
@@ -113,17 +112,6 @@ const initAuth = async () => {
       last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
-
-    -- One-off app settings. claim_opens_at is recorded the first time this
-    -- migration runs on a database, so the 30-day claim window starts at the
-    -- real deploy, not at some hardcoded date.
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-    INSERT INTO app_settings (key, value)
-      VALUES ('claim_opens_at', NOW()::text)
-      ON CONFLICT (key) DO NOTHING;
   `);
 };
 

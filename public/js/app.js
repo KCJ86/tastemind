@@ -10,10 +10,9 @@ const state = {
   priceLevels: loadBudget(), // [] means any price
 };
 
-// Set by the pre-accounts version of the app, which signed people in with
-// a code. Read once to prefill the claim form, then deleted after a claim.
-const LEGACY_CODE_KEY = "tm_user_code";
-const LEGACY_PENDING_KEY = "tm_pending";
+// Left in localStorage by the pre-accounts version of the app (a sign-in
+// code and one shared pending list). Nothing reads them; they're cleared.
+const OLD_STORAGE_KEYS = ["tm_user_code", "tm_pending"];
 
 // ── INIT ───────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", async () => {
@@ -21,6 +20,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   renderBudget();
   paintRadius();
   api.onUnauthorized = handleSessionEnded;
+  OLD_STORAGE_KEYS.forEach(removeStorage);
 
   // Nothing is shown until we know whether there's a session, so neither
   // the sign-in screen nor the app flashes on load.
@@ -37,7 +37,6 @@ window.addEventListener("DOMContentLoaded", async () => {
 function bindStaticEvents() {
   document.getElementById("form-signin").addEventListener("submit", handleSignIn);
   document.getElementById("form-signup").addEventListener("submit", handleSignUp);
-  document.getElementById("form-claim").addEventListener("submit", handleClaim);
   bindAuthTabs();
   document.querySelectorAll(".reveal-btn").forEach((btn) => {
     ui.setPasswordVisible(btn, false);
@@ -337,7 +336,7 @@ document.addEventListener("mouseout", (e) => {
 });
 
 // ── SIGN-IN SCREEN ─────────────────────────────────
-const AUTH_TABS = ["signin", "signup", "claim"];
+const AUTH_TABS = ["signin", "signup"];
 
 // Arrow keys move between tabs (the ARIA tabs pattern); Tab moves into the form.
 function bindAuthTabs() {
@@ -353,16 +352,8 @@ function bindAuthTabs() {
   });
 }
 
-// Someone who used the code version on this device lands on the claim tab
-// with their code already filled in.
 function showSignIn() {
-  const legacyCode = readStorage(LEGACY_CODE_KEY);
-  if (legacyCode) {
-    document.getElementById("claim-code").value = legacyCode;
-    ui.selectAuthTab("claim");
-  } else {
-    ui.selectAuthTab("signin");
-  }
+  ui.selectAuthTab("signin");
   ui.showScreen("onboard");
 }
 
@@ -458,10 +449,7 @@ function handleSignIn(e) {
     busyLabel: "Signing in…",
     call: () => api.login(form.elements.username.value.trim(), form.elements.password.value),
     messages: { 401: { text: "Wrong username or password." } },
-    onSuccess: (user) => {
-      adoptLegacyPending(user.id);
-      enterApp(user);
-    },
+    onSuccess: enterApp,
   });
 }
 
@@ -481,36 +469,8 @@ function handleSignUp(e) {
         email: value("email") || undefined,
       }),
     onSuccess: (user) => {
-      adoptLegacyPending(user.id);
       enterApp(user);
       ui.showToast(`Welcome, ${user.name}`);
-    },
-  });
-}
-
-function handleClaim(e) {
-  e.preventDefault();
-  const form = e.currentTarget;
-  const value = (name) => form.elements[name].value.trim();
-  submitAuthForm(form, {
-    errors: requireFields(form, ["user_code", "username", "password"], checkNewAccountFields(form)),
-    busyLabel: "Claiming your account…",
-    call: () =>
-      api.claim({
-        user_code: value("user_code"),
-        username: value("username"),
-        password: form.elements.password.value,
-        email: value("email") || undefined,
-      }),
-    messages: {
-      401: { field: "user_code", text: "That code isn't valid, or it has already been claimed." },
-      410: { text: "The window for claiming old accounts has closed. Create a new account instead." },
-    },
-    onSuccess: (user) => {
-      removeStorage(LEGACY_CODE_KEY);
-      adoptLegacyPending(user.id);
-      enterApp(user);
-      ui.showToast(`Account claimed. Welcome back, ${user.name}`);
     },
   });
 }
@@ -615,19 +575,6 @@ function getPending() {
 
 function savePending(list) {
   writeStorage(pendingKey(state.currentUser.id), JSON.stringify(list));
-}
-
-// The code version kept one shared tm_pending list. The first account to
-// sign in on this device takes it over, so no meal waiting for review is lost.
-function adoptLegacyPending(userId) {
-  const legacy = readPending(LEGACY_PENDING_KEY);
-  if (legacy.length === 0) return removeStorage(LEGACY_PENDING_KEY);
-
-  const mine = readPending(pendingKey(userId));
-  const known = new Set(mine.map((r) => r.place_id));
-  const merged = [...mine, ...legacy.filter((r) => !known.has(r.place_id))];
-  writeStorage(pendingKey(userId), JSON.stringify(merged));
-  removeStorage(LEGACY_PENDING_KEY);
 }
 
 function addPending(restaurant) {

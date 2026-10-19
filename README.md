@@ -25,7 +25,7 @@ The more you use it, the smarter it gets. Every review you write is embedded and
 - **Pending feedback loop** — "I'm going here" saves a restaurant pending your review. After your meal, rate it and it gets saved to your history
 - **Auto taste updates** — Rate something 4+ stars and your palate tags update automatically
 - **Distance radius** — Slide from 1 to 50 miles to control how far you want to search
-- **Accounts** — Sign in with a username and password; password managers and iCloud Keychain can save and fill them. Used TasteMind before accounts? Claim your old profile once with your old code and keep your history
+- **Accounts** — Sign in with a username and password; password managers and iCloud Keychain can save and fill them
 - **Light / dark mode** — Follows your device by default, or pick one and it's remembered
 - **Daily recommendation limit** — 20 recommendations per user per day to keep usage fair
 
@@ -132,6 +132,17 @@ If you already have rated visits (or just turned on RAG), embed them once:
 npm run backfill:embeddings
 ```
 
+### Resetting users
+
+To start over with no accounts, this deletes every user and everything tied to them: taste profiles, visits, ratings, review embeddings, sessions, recommendation logs and reservations. It never runs on its own.
+
+```bash
+npm run db:reset-users              # prints the database and row counts, deletes nothing
+npm run db:reset-users -- --confirm # deletes them
+```
+
+It acts on whatever `DATABASE_URL` points at, so check the database name it prints first.
+
 ### Tests
 
 ```bash
@@ -159,7 +170,7 @@ Railway (Express + Node.js)
 
 ## API Endpoints
 
-All routes are under `/api/v1`. Signing up, signing in, or claiming sets an httpOnly session cookie (`tm_session`); every other route uses that session to know who you are, and none take a user id or code.
+All routes are under `/api/v1`. Signing up or signing in sets an httpOnly session cookie (`tm_session`); every other route uses that session to know who you are, and none take a user id.
 
 **Auth**
 
@@ -168,7 +179,6 @@ All routes are under `/api/v1`. Signing up, signing in, or claiming sets an http
 | POST | `/auth/signup` | Create an account (name, username, password, city, optional email) and sign in |
 | POST | `/auth/login` | Sign in with username + password |
 | POST | `/auth/logout` | End this session |
-| POST | `/auth/claim` | One-time upgrade of a pre-accounts profile using its old code (open for 30 days after launch) |
 | GET | `/auth/me` | The signed-in user, or 401 |
 
 **Signed in** (401 without a session)
@@ -186,13 +196,12 @@ All routes are under `/api/v1`. Signing up, signing in, or claiming sets an http
 
 ## Database Schema
 
-users — name, username, password_hash (bcrypt), optional email, location; user_code only on profiles not yet claimed
+users — name, username, password_hash (bcrypt), optional email, location
 taste_profiles — liked/disliked cuisines, price range, dietary restrictions, search radius
 visits — restaurant visits tied to a user
 ratings — star rating + notes per visit
 review_embeddings — one vector per rated visit, for RAG (only created if pgvector is available)
 sessions — one row per signed-in device; stores only a SHA-256 hash of the cookie token
-app_settings — when the claim window opened
 recommendation_logs — daily usage tracking per user
 reservations — reserved for future Stripe integration
 
@@ -209,18 +218,19 @@ tastemind/
 │ ├── middleware/
 │ │ └── auth.js # Session check + cross-site request check
 │ ├── routes/
-│ │ ├── auth.js # Sign up, sign in, sign out, claim
+│ │ ├── auth.js # Sign up, sign in, sign out
 │ │ ├── users.js # Your taste, visits, ratings, location
 │ │ └── recommendations.js # Claude + Places integration
 │ └── services/
-│ ├── authService.js # Passwords, sessions, claiming
+│ ├── authService.js # Passwords, accounts, sessions
 │ ├── claudeService.js # NL → structured recommendation
 │ ├── embeddingService.js # Voyage AI embeddings
 │ ├── retrievalService.js # RAG: index reviews + pick prompt context
 │ ├── mapsService.js # Google Places + Geocoding
 │ └── userService.js # DB queries
 ├── scripts/
-│ └── backfill-embeddings.js # Embed any reviews missing a vector
+│ ├── backfill-embeddings.js # Embed any reviews missing a vector
+│ └── reset-users.js # Delete every user and their data (npm run db:reset-users)
 ├── tests/ # node:test + supertest, against TEST_DATABASE_URL
 ├── public/
 │ ├── index.html
@@ -241,7 +251,7 @@ tastemind/
 - **Passwords** hashed with bcrypt (cost 12); a wrong username and a wrong password get the same response
 - **Sessions** — random token in an httpOnly, SameSite=Lax cookie (Secure in production); only its hash is stored, and signing out deletes it
 - **Cross-site requests** — state-changing API requests from another site's origin are rejected
-- **Rate limiting** — 100 requests / 15 min per IP overall, 10 AI requests / min per user; sign-in 10 failed attempts / 15 min per IP and 5 per username; claiming old codes 5 / hour per IP plus an app-wide cap; sign-up 5 / hour per IP
+- **Rate limiting** — 100 requests / 15 min per IP overall, 10 AI requests / min per user; sign-in 10 failed attempts / 15 min per IP and 5 per username; sign-up 5 / hour per IP
 - **Per-user daily limit** — 20 recommendations per user per day
 - **Input validation** via `express-validator` on all routes
 - **Parameterized queries** — no raw SQL string interpolation

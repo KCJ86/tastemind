@@ -1,6 +1,5 @@
 /**
- * Summary: Auth service — password hashing, sessions, and claiming legacy
- * user_code accounts.
+ * Summary: Auth service — password hashing, accounts, and sessions.
  */
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
@@ -15,7 +14,6 @@ const BCRYPT_ROUNDS =
 
 const SESSION_COOKIE = "tm_session";
 const SESSION_DAYS = 30;
-const CLAIM_WINDOW_DAYS = 30;
 
 // Compared against when the username doesn't exist, so a wrong username
 // takes as long as a wrong password and the two can't be told apart.
@@ -28,7 +26,6 @@ const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
 
 // Returns the user if username + password match, otherwise null.
-// Unclaimed legacy accounts have no password_hash and can never log in.
 const verifyLogin = async (username, password) => {
   const result = await pool.query(
     `SELECT id, password_hash FROM users
@@ -81,34 +78,6 @@ const createAccount = async ({ name, username, password, location, email }) => {
   }
 };
 
-// The window opens the first time the auth migration runs on a database
-// (app_settings.claim_opens_at) and lasts CLAIM_WINDOW_DAYS.
-const isClaimWindowOpen = async () => {
-  const result = await pool.query(
-    `SELECT value::timestamptz + make_interval(days => $1) > NOW() AS open
-     FROM app_settings WHERE key = 'claim_opens_at'`,
-    [CLAIM_WINDOW_DAYS],
-  );
-  return result.rows[0]?.open === true;
-};
-
-// Turns a legacy user_code account into a real one. A single UPDATE, so two
-// simultaneous claims of the same code can't both succeed; user_code is
-// cleared in the same statement so the code can never be used again.
-// Returns the user, or null if the code is unknown or already claimed.
-const claimAccount = async ({ userCode, username, password, email }) => {
-  const passwordHash = await hashPassword(password);
-  const result = await pool.query(
-    `UPDATE users
-     SET username = $2, password_hash = $3, email = $4,
-         claimed_at = NOW(), user_code = NULL
-     WHERE user_code = $1 AND password_hash IS NULL
-     RETURNING id`,
-    [userCode, username, passwordHash, email || null],
-  );
-  return result.rows[0] ? getUserById(result.rows[0].id) : null;
-};
-
 // ─── Sessions ─────────────────────────────────────────
 const createSession = async (userId) => {
   const token = crypto.randomBytes(32).toString("hex");
@@ -153,13 +122,10 @@ const sessionCookieOptions = () => ({
 
 module.exports = {
   SESSION_COOKIE,
-  CLAIM_WINDOW_DAYS,
   verifyLogin,
   isUsernameTaken,
   isEmailTaken,
   createAccount,
-  isClaimWindowOpen,
-  claimAccount,
   createSession,
   getSessionUser,
   deleteSession,

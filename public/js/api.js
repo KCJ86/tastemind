@@ -36,8 +36,6 @@ const api = {
   login: (username, password) =>
     request("POST", "/auth/login", { username, password }),
 
-  claim: (fields) => request("POST", "/auth/claim", fields),
-
   logout: () => request("POST", "/auth/logout"),
 
   // ── USER ─────────────────────────────────────────
