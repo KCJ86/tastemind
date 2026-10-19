@@ -2,90 +2,61 @@
 // All backend communication lives here.
 // No DOM manipulation, no state — just fetch calls.
 
-const API_BASE =
-  window.location.hostname === "localhost"
-    ? "http://localhost:3000/api/v1"
-    : `${window.location.origin}/api/v1`;
+// Same origin as the page, so the session cookie is sent automatically.
+const API_BASE = "/api/v1";
+
+// Every call resolves to the JSON body plus `status`, so callers can tell a
+// wrong password (401) from a taken username (409) from a rate limit (429).
+const request = async (method, path, body) => {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  // A 401 from anywhere but /auth means the session expired or was signed
+  // out elsewhere. /auth 401s are answers (wrong password, bad code) that
+  // the sign-in forms show themselves.
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    api.onUnauthorized();
+  }
+  return { ...data, status: res.status };
+};
 
 const api = {
-  // ── USERS ────────────────────────────────────────
-  createUser: async (name, location) => {
-    const res = await fetch(`${API_BASE}/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, location }),
-    });
-    return res.json();
-  },
+  // Replaced by app.js; sends the user back to the sign-in screen.
+  onUnauthorized: () => {},
 
-  getUser: async (user_code) => {
-    const res = await fetch(`${API_BASE}/users/${user_code}`);
-    return res.json();
-  },
+  // ── AUTH ─────────────────────────────────────────
+  me: () => request("GET", "/auth/me"),
 
-  getVisits: async (user_code) => {
-    const res = await fetch(`${API_BASE}/users/${user_code}/visits`);
-    return res.json();
-  },
+  signup: (fields) => request("POST", "/auth/signup", fields),
 
-  rateVisit: async (user_code, visit_id, rating, notes) => {
-    const res = await fetch(
-      `${API_BASE}/users/${user_code}/visits/${visit_id}/rate`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rating, notes }),
-      },
-    );
-    return res.json();
-  },
+  login: (username, password) =>
+    request("POST", "/auth/login", { username, password }),
 
-  updateTaste: async (user_code, updates) => {
-    const res = await fetch(`${API_BASE}/users/${user_code}/taste`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    return res.json();
-  },
+  logout: () => request("POST", "/auth/logout"),
+
+  // ── USER ─────────────────────────────────────────
+  getVisits: () => request("GET", "/users/me/visits"),
+
+  rateVisit: (visit_id, rating, notes) =>
+    request("POST", `/users/me/visits/${visit_id}/rate`, { rating, notes }),
+
+  updateTaste: (updates) => request("PATCH", "/users/me/taste", updates),
+
+  updateLocation: (location) =>
+    request("PATCH", "/users/me/location", { location }),
 
   // ── RECOMMENDATIONS ──────────────────────────────
-  getRecommendations: async (
-    user_code,
-    craving,
-    location = null,
-    radius = 10,
-    priceLevels = [],
-  ) => {
-    const res = await fetch(`${API_BASE}/recommendations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_code,
-        craving,
-        location,
-        radius,
-        price_levels: priceLevels,
-      }),
-    });
-    return res.json();
-  },
+  getRecommendations: (craving, location = null, radius = 10, priceLevels = []) =>
+    request("POST", "/recommendations", {
+      craving,
+      location,
+      radius,
+      price_levels: priceLevels,
+    }),
 
-  saveVisit: async (user_code, restaurant) => {
-    const res = await fetch(`${API_BASE}/recommendations/save`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_code, ...restaurant }),
-    });
-    return res.json();
-  },
-
-  updateLocation: async (user_code, location) => {
-    const res = await fetch(`${API_BASE}/users/${user_code}/location`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ location }),
-    });
-    return res.json();
-  },
+  saveVisit: (restaurant) => request("POST", "/recommendations/save", restaurant),
 };

@@ -18,7 +18,6 @@ const initDb = async () => {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
-        user_code TEXT UNIQUE NOT NULL,
         location TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -79,7 +78,41 @@ const initDb = async () => {
     client.release();
   }
 
+  await initAuth();
   await initRag();
+};
+
+// ─── Accounts + sessions ───────────────────────────────
+const initAuth = async () => {
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;              -- optional, for recovery later
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
+
+    -- Left over from sign-in codes and the claim flow, both removed.
+    ALTER TABLE users DROP COLUMN IF EXISTS user_code;
+    ALTER TABLE users DROP COLUMN IF EXISTS claimed_at;
+    DROP TABLE IF EXISTS app_settings;
+
+    -- Case-insensitive uniqueness: "Kennedy" and "kennedy" are the same account.
+    CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower
+      ON users (LOWER(username));
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower
+      ON users (LOWER(email)) WHERE email IS NOT NULL;
+
+    -- The cookie holds a random token; only its SHA-256 is stored, so a
+    -- leaked database can't be used to hijack sessions.
+    CREATE TABLE IF NOT EXISTS sessions (
+      id SERIAL PRIMARY KEY,
+      token_hash TEXT UNIQUE NOT NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP NOT NULL,
+      last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+  `);
 };
 
 // ─── RAG (pgvector) ────────────────────────────────────

@@ -25,7 +25,7 @@ The more you use it, the smarter it gets. Every review you write is embedded and
 - **Pending feedback loop** — "I'm going here" saves a restaurant pending your review. After your meal, rate it and it gets saved to your history
 - **Auto taste updates** — Rate something 4+ stars and your palate tags update automatically
 - **Distance radius** — Slide from 1 to 50 miles to control how far you want to search
-- **User codes** — No passwords. Get a unique code like `kennedy_cd64` to return to your profile anytime
+- **Accounts** — Sign in with a username and password; password managers and iCloud Keychain can save and fill them
 - **Light / dark mode** — Follows your device by default, or pick one and it's remembered
 - **Daily recommendation limit** — 20 recommendations per user per day to keep usage fair
 
@@ -110,6 +110,7 @@ VOYAGE_API_KEY=your_voyage_key_here
 GOOGLE_MAPS_API_KEY=your_google_maps_key_here
 DATABASE_URL=postgresql://postgres:password@host:port/railway
 DATABASE_SSL=false
+TEST_DATABASE_URL=postgresql://user:password@localhost:5432/tastemind_test   # only for npm test
 PORT=3000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3000
@@ -131,6 +132,25 @@ If you already have rated visits (or just turned on RAG), embed them once:
 npm run backfill:embeddings
 ```
 
+### Resetting users
+
+To start over with no accounts, this deletes every user and everything tied to them: taste profiles, visits, ratings, review embeddings, sessions, recommendation logs and reservations. It never runs on its own.
+
+```bash
+npm run db:reset-users              # prints the database and row counts, deletes nothing
+npm run db:reset-users -- --confirm # deletes them
+```
+
+It acts on whatever `DATABASE_URL` points at, so check the database name it prints first.
+
+### Tests
+
+```bash
+npm test
+```
+
+Tests use Node's built-in test runner and supertest. They run against `TEST_DATABASE_URL` and **wipe it before every test**, so it must be a local database whose name ends in `_test`. The tests refuse to start otherwise. External APIs (Claude, Voyage, Google) are stubbed and never called.
+
 ---
 
 ## Architecture
@@ -150,24 +170,38 @@ Railway (Express + Node.js)
 
 ## API Endpoints
 
-POST /api/v1/users Create a new user
-GET /api/v1/users/:code Get user + taste profile
-PATCH /api/v1/users/:code/taste Update taste preferences
-GET /api/v1/users/:code/visits Get visit history
-POST /api/v1/users/:code/visits/:id/rate Rate a visit (also embeds the review)
-PATCH /api/v1/users/:code/location Update saved location
-POST /api/v1/recommendations Get AI recommendations
-POST /api/v1/recommendations/save Save a visit
+All routes are under `/api/v1`. Signing up or signing in sets an httpOnly session cookie (`tm_session`); every other route uses that session to know who you are, and none take a user id.
+
+**Auth**
+
+| Method | Route | What it does |
+| ------ | ----- | ------------ |
+| POST | `/auth/signup` | Create an account (name, username, password, city, optional email) and sign in |
+| POST | `/auth/login` | Sign in with username + password |
+| POST | `/auth/logout` | End this session |
+| GET | `/auth/me` | The signed-in user, or 401 |
+
+**Signed in** (401 without a session)
+
+| Method | Route | What it does |
+| ------ | ----- | ------------ |
+| GET | `/users/me/visits` | Your visit history |
+| PATCH | `/users/me/taste` | Update taste preferences |
+| POST | `/users/me/visits/:id/rate` | Rate one of your visits (also embeds the review) |
+| PATCH | `/users/me/location` | Update your saved location |
+| POST | `/recommendations` | Get AI recommendations |
+| POST | `/recommendations/save` | Save a visit |
 
 ---
 
 ## Database Schema
 
-users — name, user_code, location
+users — name, username, password_hash (bcrypt), optional email, location
 taste_profiles — liked/disliked cuisines, price range, dietary restrictions, search radius
 visits — restaurant visits tied to a user
 ratings — star rating + notes per visit
 review_embeddings — one vector per rated visit, for RAG (only created if pgvector is available)
+sessions — one row per signed-in device; stores only a SHA-256 hash of the cookie token
 recommendation_logs — daily usage tracking per user
 reservations — reserved for future Stripe integration
 
@@ -177,20 +211,27 @@ reservations — reserved for future Stripe integration
 
 tastemind/
 ├── src/
-│ ├── index.js # Express app + middleware
+│ ├── index.js # Runs migrations, starts the server
+│ ├── app.js # Express app + middleware (imported by tests)
 │ ├── db/
 │ │ └── database.js # PostgreSQL pool + migrations
+│ ├── middleware/
+│ │ └── auth.js # Session check + cross-site request check
 │ ├── routes/
-│ │ ├── users.js # User CRUD + taste + ratings + location
+│ │ ├── auth.js # Sign up, sign in, sign out
+│ │ ├── users.js # Your taste, visits, ratings, location
 │ │ └── recommendations.js # Claude + Places integration
 │ └── services/
+│ ├── authService.js # Passwords, accounts, sessions
 │ ├── claudeService.js # NL → structured recommendation
 │ ├── embeddingService.js # Voyage AI embeddings
 │ ├── retrievalService.js # RAG: index reviews + pick prompt context
 │ ├── mapsService.js # Google Places + Geocoding
 │ └── userService.js # DB queries
 ├── scripts/
-│ └── backfill-embeddings.js # Embed any reviews missing a vector
+│ ├── backfill-embeddings.js # Embed any reviews missing a vector
+│ └── reset-users.js # Delete every user and their data (npm run db:reset-users)
+├── tests/ # node:test + supertest, against TEST_DATABASE_URL
 ├── public/
 │ ├── index.html
 │ ├── css/styles.css
@@ -207,7 +248,10 @@ tastemind/
 ## Security
 
 - **Helmet** for HTTP security headers
-- **Rate limiting** — 100 requests / 15 min globally, 10 requests / min on the AI endpoint
+- **Passwords** hashed with bcrypt (cost 12); a wrong username and a wrong password get the same response
+- **Sessions** — random token in an httpOnly, SameSite=Lax cookie (Secure in production); only its hash is stored, and signing out deletes it
+- **Cross-site requests** — state-changing API requests from another site's origin are rejected
+- **Rate limiting** — 100 requests / 15 min per IP overall, 10 AI requests / min per user; sign-in 10 failed attempts / 15 min per IP and 5 per username; sign-up 5 / hour per IP
 - **Per-user daily limit** — 20 recommendations per user per day
 - **Input validation** via `express-validator` on all routes
 - **Parameterized queries** — no raw SQL string interpolation

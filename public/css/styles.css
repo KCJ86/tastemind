@@ -31,6 +31,7 @@
   /* Paper tickets stay light in both themes */
   --paper: #fcfcfa;
   --steel-field: rgba(255, 255, 255, 0.6);
+  --segment-on: #ffffff; /* selected segment of a control set into steel */
 
   --accent: #7a2e4d; /* wine */
   --accent-hover: #65243f;
@@ -38,6 +39,7 @@
   --accent-tint: rgba(122, 46, 77, 0.08);
   --success: #1f7a4a;
   --danger: #b42318;
+  --danger-on-steel: #8a1a12; /* --danger is under 4.5:1 on parts of the steel */
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05);
@@ -92,6 +94,7 @@
     --on-steel-2: #b8bcc0;
     --paper: #f2f1ec;
     --steel-field: rgba(0, 0, 0, 0.28);
+    --segment-on: #484c50;
 
     /* Dark mode accent: polished steel on blackened steel */
     --accent: #d6d9db;
@@ -100,6 +103,7 @@
     --accent-tint: rgba(214, 217, 219, 0.1);
     --success: #4cc38a;
     --danger: #ff6b5e;
+    --danger-on-steel: #ff8a80;
 
     --shadow-1: none;
     --shadow-2: none;
@@ -134,6 +138,7 @@
   --on-steel-2: #b8bcc0;
   --paper: #f2f1ec;
   --steel-field: rgba(0, 0, 0, 0.28);
+  --segment-on: #484c50;
 
   /* Dark mode accent: polished steel on blackened steel */
   --accent: #d6d9db;
@@ -142,6 +147,7 @@
   --accent-tint: rgba(214, 217, 219, 0.1);
   --success: #4cc38a;
   --danger: #ff6b5e;
+  --danger-on-steel: #ff8a80;
 
   --shadow-1: none;
   --shadow-2: none;
@@ -448,39 +454,6 @@ textarea.field {
 .menu-sub {
   font-size: var(--fs-footnote);
   color: var(--text-2);
-}
-
-.code-row {
-  margin-top: 12px;
-  width: 100%;
-  padding: 10px 12px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--fill);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-}
-
-.code-row:hover {
-  background: var(--fill-strong);
-}
-
-.code-label {
-  font-size: 12px;
-  color: var(--text-2);
-}
-
-.code-value {
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.code-copy {
-  font-size: var(--fs-footnote);
-  color: var(--accent);
-  font-weight: 600;
 }
 
 .menu-stats {
@@ -1570,6 +1543,142 @@ textarea.field {
   color: var(--on-steel);
 }
 
+/* ── SIGN-IN TABS + FORMS ──────────────────────── */
+/* A segmented control set into the steel panel */
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 13px;
+  background: var(--steel-field);
+  border: 1px solid var(--steel-edge);
+}
+
+.auth-tab {
+  min-height: 44px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--on-steel-2);
+  font-size: var(--fs-footnote);
+  font-weight: 600;
+  line-height: 1.2;
+  text-wrap: balance;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.auth-tab:hover {
+  color: var(--on-steel);
+}
+
+.auth-tab[aria-selected="true"] {
+  background: var(--segment-on);
+  color: var(--on-steel);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form[hidden] {
+  display: none;
+}
+
+.auth-form .btn {
+  margin-top: 4px;
+}
+
+.field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: var(--fs-footnote);
+  font-weight: 600;
+  color: var(--on-steel);
+}
+
+.field-label .optional {
+  font-weight: 400;
+  color: var(--on-steel-2);
+}
+
+.field-hint,
+.field-error {
+  font-size: var(--fs-footnote);
+  line-height: 1.35;
+}
+
+.field-hint {
+  color: var(--on-steel-2);
+}
+
+.field-error {
+  color: var(--danger-on-steel);
+  font-weight: 600;
+}
+
+.field-error[hidden],
+.form-error[hidden] {
+  display: none;
+}
+
+.onboard-panel.steel .field[aria-invalid="true"] {
+  border-color: var(--danger-on-steel);
+}
+
+/* Errors that aren't about one field (wrong password, window closed) sit on
+   a light slip at the top of the form, so they read clearly on the steel. */
+.form-error {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--danger);
+  background: var(--surface);
+  color: var(--danger);
+  font-size: var(--fs-callout);
+  font-weight: 600;
+  outline: none;
+}
+
+.password-wrap {
+  position: relative;
+}
+
+.password-wrap .field {
+  padding-right: 52px;
+}
+
+.reveal-btn {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  display: grid;
+  place-items: center;
+  color: var(--on-steel-2);
+}
+
+.reveal-btn:hover {
+  color: var(--on-steel);
+}
+
+.reveal-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* ── SMALL SCREENS ─────────────────────────────── */
 @media (max-width: 640px) {
   :root {
@@ -1587,6 +1696,14 @@ textarea.field {
 
   .inline-form {
     flex-direction: column;
+  }
+
+  .onboard-panel {
+    padding: 20px;
+  }
+
+  .auth-tab {
+    padding: 6px 4px;
   }
 
   .prompt {

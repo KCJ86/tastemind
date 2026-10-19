@@ -4,53 +4,20 @@
  * Summary: User service — all DB queries, now using PostgreSQL
  */
 const { pool } = require("../db/database");
-const crypto = require("crypto");
 
-const generateUserCode = (name) => {
-  const slug = name.toLowerCase().split(" ")[0];
-  const suffix = crypto.randomBytes(2).toString("hex");
-  return `${slug}_${suffix}`;
-};
-
-const createUser = async (name, location) => {
-  const user_code = generateUserCode(name);
-  const client = await pool.connect();
-  try {
-    const userResult = await client.query(
-      `INSERT INTO users (name, user_code, location)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [name, user_code, location],
-    );
-    const user_id = userResult.rows[0].id;
-    await client.query(`INSERT INTO taste_profiles (user_id) VALUES ($1)`, [
-      user_id,
-    ]);
-    return getUserById(user_id);
-  } finally {
-    client.release();
-  }
-};
+// Never SELECT u.* for anything sent to the client — it would include
+// password_hash. Add new user columns here deliberately.
+const PUBLIC_USER_COLUMNS = `u.id, u.name, u.username, u.email,
+            u.location, u.created_at`;
 
 const getUserById = async (id) => {
   const result = await pool.query(
-    `SELECT u.*, tp.liked_cuisines, tp.disliked_cuisines,
+    `SELECT ${PUBLIC_USER_COLUMNS}, tp.liked_cuisines, tp.disliked_cuisines,
             tp.preferred_price_range, tp.dietary_restrictions
      FROM users u
      LEFT JOIN taste_profiles tp ON tp.user_id = u.id
      WHERE u.id = $1`,
     [id],
-  );
-  return result.rows[0] || null;
-};
-
-const getUserByCode = async (user_code) => {
-  const result = await pool.query(
-    `SELECT u.*, tp.liked_cuisines, tp.disliked_cuisines,
-            tp.preferred_price_range, tp.dietary_restrictions
-     FROM users u
-     LEFT JOIN taste_profiles tp ON tp.user_id = u.id
-     WHERE u.user_code = $1`,
-    [user_code],
   );
   return result.rows[0] || null;
 };
@@ -110,12 +77,12 @@ const saveVisit = async (user_id, restaurant) => {
       restaurant.address || null,
     ],
   );
-  return { lastInsertRowid: result.rows[0].id };
+  return { id: result.rows[0].id };
 };
 
 // Only inserts if the visit belongs to this user. Returns false otherwise.
-// (Previously any user_code could rate any visit_id — and with RAG, that text
-// would be embedded into the visit OWNER's retrieval context.)
+// Without this check, a review written by one user would be embedded into
+// the visit owner's RAG context.
 const saveRating = async (visit_id, user_id, rating, notes) => {
   const result = await pool.query(
     `INSERT INTO ratings (visit_id, user_id, rating, notes)
@@ -146,9 +113,7 @@ const logRecommendation = async (user_id) => {
 };
 
 module.exports = {
-  createUser,
   getUserById,
-  getUserByCode,
   updateTasteProfile,
   getRecentVisits,
   saveVisit,

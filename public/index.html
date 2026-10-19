@@ -30,8 +30,10 @@
       </div>
     </header>
 
-    <!-- ONBOARDING SCREEN -->
-    <div class="screen active" id="screen-onboard">
+    <!-- SIGN-IN SCREEN -->
+    <!-- No screen starts active: app.js asks /auth/me first, then shows
+         either this screen or the app, so neither flashes. -->
+    <div class="screen" id="screen-onboard">
       <section class="onboard">
         <h1 class="onboard-title">
           Tell it what you're craving. <strong>It finds the place.</strong>
@@ -41,42 +43,85 @@
           fits you a little better than the last.
         </p>
 
-        <div class="panel onboard-panel steel">
-          <div class="field-group">
-            <label class="visually-hidden" for="new-name">First name</label>
-            <input
-              class="field"
-              type="text"
-              id="new-name"
-              placeholder="First name"
-              autocomplete="given-name"
-            />
-            <label class="visually-hidden" for="new-location">City</label>
-            <input
-              class="field"
-              type="text"
-              id="new-location"
-              placeholder="City, e.g. San Jose"
-              autocomplete="address-level2"
-            />
+        <div class="panel onboard-panel steel auth">
+          <div class="auth-tabs" role="tablist" aria-label="Account">
+            <button class="auth-tab" type="button" role="tab" id="tab-signin"
+              aria-controls="form-signin" aria-selected="true">Sign in</button>
+            <button class="auth-tab" type="button" role="tab" id="tab-signup"
+              aria-controls="form-signup" aria-selected="false" tabindex="-1">Create account</button>
           </div>
-          <button class="btn btn-primary btn-block" id="create-user-btn">
-            Create my taste profile
-          </button>
 
-          <div class="separator"><span>Already have a code?</span></div>
+          <!-- Real <form>s with submit buttons and autocomplete hints, so
+               iCloud Keychain and password managers offer to save and fill. -->
+          <form class="auth-form" id="form-signin" role="tabpanel"
+            aria-labelledby="tab-signin" novalidate>
+            <p class="form-error" role="alert" hidden></p>
+            <div class="field-wrap">
+              <label class="field-label" for="signin-username">Username</label>
+              <input class="field" type="text" id="signin-username" name="username"
+                autocomplete="username" autocapitalize="none" autocorrect="off"
+                spellcheck="false" required />
+              <p class="field-error" id="signin-username-error" hidden></p>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="signin-password">Password</label>
+              <div class="password-wrap">
+                <input class="field" type="password" id="signin-password" name="password"
+                  autocomplete="current-password" required />
+                <button class="reveal-btn" type="button" aria-controls="signin-password"
+                  aria-pressed="false" aria-label="Show password"></button>
+              </div>
+              <p class="field-error" id="signin-password-error" hidden></p>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+          </form>
 
-          <div class="inline-form">
-            <label class="visually-hidden" for="returning-code">Your code</label>
-            <input
-              class="field"
-              type="text"
-              id="returning-code"
-              placeholder="Your code"
-              autocomplete="off"
-            />
-            <button class="btn btn-secondary" id="load-user-btn">Sign in</button>
-          </div>
+          <form class="auth-form" id="form-signup" role="tabpanel"
+            aria-labelledby="tab-signup" novalidate hidden>
+            <p class="form-error" role="alert" hidden></p>
+            <div class="field-wrap">
+              <label class="field-label" for="signup-name">First name</label>
+              <input class="field" type="text" id="signup-name" name="name"
+                autocomplete="given-name" maxlength="60" required />
+              <p class="field-error" id="signup-name-error" hidden></p>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="signup-username">Username</label>
+              <input class="field" type="text" id="signup-username" name="username"
+                autocomplete="username" autocapitalize="none" autocorrect="off"
+                spellcheck="false" maxlength="30" aria-describedby="signup-username-hint" required />
+              <p class="field-hint" id="signup-username-hint">3 to 30 letters, numbers, underscores or dots</p>
+              <p class="field-error" id="signup-username-error" hidden></p>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="signup-password">Password</label>
+              <div class="password-wrap">
+                <input class="field" type="password" id="signup-password" name="password"
+                  autocomplete="new-password" minlength="10"
+                  aria-describedby="signup-password-hint" required />
+                <button class="reveal-btn" type="button" aria-controls="signup-password"
+                  aria-pressed="false" aria-label="Show password"></button>
+              </div>
+              <p class="field-hint" id="signup-password-hint">At least 10 characters</p>
+              <p class="field-error" id="signup-password-error" hidden></p>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="signup-location">City</label>
+              <input class="field" type="text" id="signup-location" name="location"
+                placeholder="e.g. San Jose" autocomplete="address-level2" required />
+              <p class="field-error" id="signup-location-error" hidden></p>
+            </div>
+            <div class="field-wrap">
+              <label class="field-label" for="signup-email">Email <span class="optional">(optional)</span></label>
+              <input class="field" type="email" id="signup-email" name="email"
+                autocomplete="email" autocapitalize="none" spellcheck="false"
+                aria-describedby="signup-email-hint" />
+              <p class="field-hint" id="signup-email-hint">For account recovery, once it's available</p>
+              <p class="field-error" id="signup-email-error" hidden></p>
+            </div>
+            <button class="btn btn-primary btn-block" type="submit">Create account</button>
+          </form>
+
         </div>
       </section>
     </div>

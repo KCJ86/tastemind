@@ -1,14 +1,14 @@
 /**
  * Author: Kennedy Castillon Jimenez
  * Date: March 27th, 2026
- * Summary: User routes — CRUD, taste profile, ratings, location
+ * Summary: User routes — taste profile, visits, ratings, location.
+ *   Every route acts on the signed-in user (req.user); there is no way to
+ *   name another user. Accounts are created via /api/v1/auth.
  */
 const express = require("express");
 const router = express.Router();
-const { body, validationResult } = require("express-validator");
+const { body, param, validationResult } = require("express-validator");
 const {
-  createUser,
-  getUserByCode,
   updateTasteProfile,
   getRecentVisits,
   saveRating,
@@ -19,50 +19,21 @@ const {
   getUserCoordinates,
   getResolvedLocationName,
 } = require("../services/mapsService");
+const { requireAuth } = require("../middleware/auth");
 
-// POST /api/v1/users
-router.post(
-  "/",
-  [
-    body("name").trim().notEmpty().withMessage("Name is required"),
-    body("location").trim().notEmpty().withMessage("Location is required"),
-  ],
+router.use(requireAuth);
+
+// PATCH /api/v1/users/me/taste
+router.patch(
+  "/me/taste",
+  [body("liked_cuisines").optional().isArray()],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const user = await createUser(req.body.name, req.body.location);
-      res.status(201).json({ success: true, user });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: "Could not create user" });
-    }
-  },
-);
-
-// GET /api/v1/users/:code
-router.get("/:code", async (req, res) => {
-  try {
-    const user = await getUserByCode(req.params.code);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ success: true, user });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Could not get user" });
-  }
-});
-
-// PATCH /api/v1/users/:code/taste
-router.patch(
-  "/:code/taste",
-  [body("liked_cuisines").optional().isArray()],
-  async (req, res) => {
-    try {
-      const user = await getUserByCode(req.params.code);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      await updateTasteProfile(user.id, req.body);
+      await updateTasteProfile(req.user.id, req.body);
       res.json({ success: true });
     } catch (err) {
       console.error(err);
@@ -71,12 +42,10 @@ router.patch(
   },
 );
 
-// GET /api/v1/users/:code/visits
-router.get("/:code/visits", async (req, res) => {
+// GET /api/v1/users/me/visits
+router.get("/me/visits", async (req, res) => {
   try {
-    const user = await getUserByCode(req.params.code);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    const visits = await getRecentVisits(user.id, 20);
+    const visits = await getRecentVisits(req.user.id, 20);
     res.json({ success: true, visits });
   } catch (err) {
     console.error(err);
@@ -84,10 +53,11 @@ router.get("/:code/visits", async (req, res) => {
   }
 });
 
-// POST /api/v1/users/:code/visits/:id/rate
+// POST /api/v1/users/me/visits/:id/rate
 router.post(
-  "/:code/visits/:id/rate",
+  "/me/visits/:id/rate",
   [
+    param("id").isInt({ min: 1 }).toInt(),
     body("rating").isInt({ min: 1, max: 5 }).withMessage("Rating must be 1-5"),
     body("notes").optional().trim(),
   ],
@@ -97,12 +67,12 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const user = await getUserByCode(req.params.code);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      const visitId = parseInt(req.params.id);
+      const visitId = req.params.id;
+      // saveRating only inserts if the visit belongs to req.user, so a
+      // visit id from someone else's account is just "not found".
       const saved = await saveRating(
         visitId,
-        user.id,
+        req.user.id,
         req.body.rating,
         req.body.notes,
       );
@@ -127,16 +97,13 @@ router.post(
   },
 );
 
-// PATCH /api/v1/users/:code/location
-router.patch("/:code/location", async (req, res) => {
+// PATCH /api/v1/users/me/location
+router.patch("/me/location", async (req, res) => {
   const { location } = req.body;
-  if (!location || !location.trim()) {
+  if (typeof location !== "string" || !location.trim()) {
     return res.status(400).json({ error: "Location is required" });
   }
   try {
-    const user = await getUserByCode(req.params.code);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
     const coordinates = await getUserCoordinates(location.trim());
     if (!coordinates) {
       return res.status(400).json({
@@ -147,9 +114,9 @@ router.patch("/:code/location", async (req, res) => {
     }
 
     const resolvedName = await getResolvedLocationName(location.trim());
-    await pool.query("UPDATE users SET location = $1 WHERE user_code = $2", [
+    await pool.query("UPDATE users SET location = $1 WHERE id = $2", [
       resolvedName || location.trim(),
-      req.params.code,
+      req.user.id,
     ]);
 
     res.json({

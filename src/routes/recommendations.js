@@ -5,9 +5,9 @@
  */
 const express = require("express");
 const router = express.Router();
+const rateLimit = require("express-rate-limit");
 const { body, validationResult } = require("express-validator");
 const {
-  getUserByCode,
   saveVisit,
   getDailyRecommendationCount,
   logRecommendation,
@@ -19,12 +19,23 @@ const {
   searchRestaurant,
   getUserCoordinates,
 } = require("../services/mapsService");
+const { requireAuth } = require("../middleware/auth");
+
+// Counted per signed-in user rather than per IP, so people sharing a network
+// don't share a limit and one user can't dodge it by switching networks.
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  message: { error: "AI recommendation limit reached, wait a moment." },
+});
+
+router.use(requireAuth, aiLimiter);
 
 // POST /api/v1/recommendations
 router.post(
   "/",
   [
-    body("user_code").trim().notEmpty().withMessage("user_code is required"),
     body("craving")
       .trim()
       .notEmpty()
@@ -40,11 +51,9 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const { user_code, craving, location, radius } = req.body;
+      const { craving, location, radius } = req.body;
       const priceLevels = [...new Set(req.body.price_levels || [])].sort();
-
-      const user = await getUserByCode(user_code);
-      if (!user) return res.status(404).json({ error: "User not found" });
+      const user = req.user;
 
       // Check daily limit
       const dailyCount = await getDailyRecommendationCount(user.id);
@@ -115,7 +124,6 @@ router.post(
 router.post(
   "/save",
   [
-    body("user_code").trim().notEmpty(),
     body("place_id").trim().notEmpty(),
     body("restaurant_name").trim().notEmpty(),
     body("cuisine_type").optional().trim(),
@@ -128,13 +136,10 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     try {
-      const user = await getUserByCode(req.body.user_code);
-      if (!user) return res.status(404).json({ error: "User not found" });
-
-      const visit = await saveVisit(user.id, req.body);
+      const visit = await saveVisit(req.user.id, req.body);
       res.status(201).json({
         success: true,
-        visit_id: visit.lastInsertRowid,
+        visit_id: visit.id,
         message: "Enjoy your meal! Don't forget to rate it after 🍽️",
       });
     } catch (err) {

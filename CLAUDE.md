@@ -9,9 +9,32 @@ npm install
 npm run dev                  # nodemon src/index.js — serves API + static frontend on http://localhost:3000
 npm start                    # production start (Railway)
 npm run backfill:embeddings  # embed any rated visits missing an up-to-date embedding (idempotent)
+npm run db:reset-users       # dry run: prints DATABASE_URL's db + row counts; add `-- --confirm` to delete every user and their data
 ```
 
-There is no test suite, linter, or build step. The frontend is plain static files served by Express, so frontend edits need only a browser refresh.
+### Local database
+
+Local Postgres 18 + pgvector runs from the conda env `tastemind-pg` (Homebrew is broken on this Mac), with data in `~/pgdata/tastemind` (outside the repo) on **port 5433**. It must be running before `npm run dev` or tests.
+
+```bash
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind -l ~/pgdata/tastemind.log start
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind stop
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind status
+conda run -n tastemind-pg psql -h ~/pgdata/tastemind -p 5433 -U postgres -d tastemind_dev   # superuser shell (socket, no password)
+```
+
+Databases: `tastemind_dev` (`DATABASE_URL`, restored from a production backup, so it holds real user data) and `tastemind_test` (`TEST_DATABASE_URL`, wiped by tests). Both are owned by the non-superuser role `tastemind`; the `vector` extension was pre-created by `postgres` because `tastemind` can't create it. The `.env` file has no Railway URLs. Never point `DATABASE_URL` or `TEST_DATABASE_URL` at Railway when running locally.
+
+### Tests
+
+```bash
+npm test                                                        # all tests (node:test + supertest), serially
+node --test --test-name-pattern="logout" tests/auth.test.js     # one test by name
+```
+
+Tests need the local database running and wipe `TEST_DATABASE_URL` before each test. `tests/helpers.js` refuses to run unless that URL is on localhost and the database name ends in `_test`, and it must be required before anything in `src/`. Tests import `src/app.js`, which builds the app without listening; `src/index.js` runs migrations and starts the server. Rate limiters store counts in memory for the whole test file and key on `X-Forwarded-For` (because of `trust proxy`). Use `nextIp()` and a username no other test uses whenever a test makes failed logins.
+
+There is no linter or build step. The frontend is plain static files served by Express, so frontend edits need only a browser refresh.
 
 Required env (see `.env.example`): `ANTHROPIC_API_KEY`, `GOOGLE_MAPS_API_KEY` (Places API (New) + Geocoding), `DATABASE_URL` (PostgreSQL). Optional: `VOYAGE_API_KEY` (embeddings for RAG), `CLAUDE_MODEL` (overrides the default in `claudeService.js`), `DATABASE_SSL=true` (needed for Railway's public URL), `FRONTEND_URL` (CORS origin).
 
@@ -34,8 +57,8 @@ Express 5 backend (`src/`) plus a vanilla JS frontend (`public/`) in one Railway
 - The star rating is intentionally **not** embedded, only cuisine, name, and notes. The rating is passed to Claude as metadata instead.
 - If you change `EMBEDDING_MODEL` or the dimensions, update `vector(1024)` in `database.js` and run the backfill.
 
-**Ownership**: users are identified only by `user_code` (no passwords or auth). Every route resolves `user_code` → `user.id`, and queries must scope by `user_id`. For example, `saveRating` checks that the visit belongs to the user.
+**Auth and ownership**: accounts use a username and a bcrypt password (`src/routes/auth.js`, `src/services/authService.js`). Sessions are a random token in the httpOnly `tm_session` cookie; only its SHA-256 is stored in `sessions`. User and recommendation routes sit behind `requireAuth` and act only on `req.user`. They live under `/api/v1/users/me/...`, and no route takes a user identifier from the URL or body. Queries must still scope by `user_id`; for example, `saveRating` checks that the visit belongs to the user. Never `SELECT u.*` for anything sent to the client, because it includes `password_hash`; use `PUBLIC_USER_COLUMNS` in `userService.js`. A `checkOrigin` middleware rejects cross-site `POST`/`PATCH` requests to `/api` (CSRF).
 
-**Taste profile updates happen client-side**: after a rating of 4 or more, `public/js/app.js` `autoUpdateTaste()` recomputes `liked_cuisines` from history and PATCHes `/users/:code/taste`. The server does not do this.
+**Taste profile updates happen client-side**: after a rating of 4 or more, `public/js/app.js` `autoUpdateTaste()` recomputes `liked_cuisines` from history and PATCHes `/users/me/taste`. The server does not do this.
 
-**Frontend**: no framework or bundler. Scripts are loaded as globals in this order: `theme.js` (in `<head>`, to avoid a flash of the wrong theme), then `api.js` (all fetch calls), `ui.js` (DOM rendering), and `app.js` (state and event handlers). The user code, theme, and budget are kept in `localStorage`. Dark mode uses `data-theme` on the root element plus `prefers-color-scheme`.
+**Frontend**: no framework or bundler. Scripts are loaded as globals in this order: `theme.js` (in `<head>`, to avoid a flash of the wrong theme), then `api.js` (all fetch calls), `ui.js` (DOM rendering), and `app.js` (state and event handlers). On load, `app.js` calls `/auth/me` before showing any screen. `api.js` sends any 401 from a non-`/auth` route back to sign-in; a 401 from `/auth` is shown inline as a form error. `localStorage` holds the theme, the budget and the per-user `tm_pending_<userId>` list of meals waiting for review. On load it deletes `tm_user_code` and `tm_pending`, left by the old code-based sign-in; nothing reads them. Dark mode uses `data-theme` on the root element plus `prefers-color-scheme`.

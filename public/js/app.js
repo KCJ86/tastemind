@@ -10,26 +10,42 @@ const state = {
   priceLevels: loadBudget(), // [] means any price
 };
 
+// Left in localStorage by the pre-accounts version of the app (a sign-in
+// code and one shared pending list). Nothing reads them; they're cleared.
+const OLD_STORAGE_KEYS = ["tm_user_code", "tm_pending"];
+
 // ── INIT ───────────────────────────────────────────
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   bindStaticEvents();
   renderBudget();
   paintRadius();
-  const savedCode = localStorage.getItem("tm_user_code");
-  if (savedCode) fetchAndEnterApp(savedCode);
+  api.onUnauthorized = handleSessionEnded;
+  OLD_STORAGE_KEYS.forEach(removeStorage);
+
+  // Nothing is shown until we know whether there's a session, so neither
+  // the sign-in screen nor the app flashes on load.
+  try {
+    const data = await api.me();
+    if (data.success) return enterApp(data.user);
+  } catch {
+    /* offline or server down: fall through to sign-in */
+  }
+  showSignIn();
 });
 
 // ── STATIC EVENT BINDINGS ──────────────────────────
 function bindStaticEvents() {
-  document
-    .getElementById("create-user-btn")
-    .addEventListener("click", handleCreateUser);
-  document
-    .getElementById("load-user-btn")
-    .addEventListener("click", handleLoadUser);
-  document.getElementById("returning-code").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") handleLoadUser();
+  document.getElementById("form-signin").addEventListener("submit", handleSignIn);
+  document.getElementById("form-signup").addEventListener("submit", handleSignUp);
+  bindAuthTabs();
+  document.querySelectorAll(".reveal-btn").forEach((btn) => {
+    ui.setPasswordVisible(btn, false);
+    btn.addEventListener("click", () =>
+      ui.setPasswordVisible(btn, btn.getAttribute("aria-pressed") !== "true"),
+    );
   });
+  bindLocationEvents();
+
   document.getElementById("radius-slider").addEventListener("input", (e) => {
     const val = e.target.value;
     document.getElementById("radius-value").textContent = `${val} miles`;
@@ -168,33 +184,9 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Copy user code
-  if (e.target.closest("#copy-code-btn")) {
-    navigator.clipboard.writeText(state.currentUser.user_code);
-    ui.showToast("Code copied");
-    return;
-  }
-
-  // Go home
-  if (e.target.closest("#dropdown-home")) {
-    const dd = document.getElementById("user-dropdown");
-    if (dd) dd.style.display = "none";
-    ui.showScreen("onboard");
-    return;
-  }
-
   // Sign out
   if (e.target.closest("#dropdown-signout")) {
-    document.body.classList.remove("app-active");
-    localStorage.removeItem("tm_user_code");
-    state.currentUser = null;
-    state.selectedRating = 0;
-    state.pendingRateVisit = null;
-    ui.clearHeader();
-    ui.closeDrawer();
-    ui.renderEmpty();
-    ui.showScreen("onboard");
-    ui.showToast("Signed out");
+    handleSignOut();
     return;
   }
 
@@ -226,17 +218,16 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ── LOCATION EDITING ───────────────────────────────
-function initLocation() {
-  const user = state.currentUser;
-  ui.renderLocation(user.location);
-
+// Bound once at startup (not on every sign-in, which stacked duplicate
+// listeners) and always reads the current user.
+function bindLocationEvents() {
   document
     .getElementById("location-edit-btn")
     ?.addEventListener("click", () => {
       document.getElementById("location-display").style.display = "none";
       document.getElementById("location-edit").style.display = "flex"; // flex, so the CSS gap spaces the field and buttons
       const input = document.getElementById("location-input");
-      input.value = user.location || "";
+      input.value = state.currentUser?.location || "";
       input.focus();
     });
 
@@ -282,7 +273,7 @@ async function handleSaveLocation() {
   btn.textContent = "Checking…";
 
   try {
-    const data = await api.updateLocation(state.currentUser.user_code, input);
+    const data = await api.updateLocation(input);
 
     if (data.invalid) {
       // Show error — location not found
@@ -344,73 +335,246 @@ document.addEventListener("mouseout", (e) => {
   highlightRow(star.parentElement, chosen);
 });
 
-// ── USER HANDLERS ──────────────────────────────────
-async function handleCreateUser() {
-  const name = document.getElementById("new-name").value.trim();
-  const location = document.getElementById("new-location").value.trim();
+// ── SIGN-IN SCREEN ─────────────────────────────────
+const AUTH_TABS = ["signin", "signup"];
 
-  if (!name || !location) {
-    ui.showToast("Please fill in both fields");
-    return;
+// Arrow keys move between tabs (the ARIA tabs pattern); Tab moves into the form.
+function bindAuthTabs() {
+  document.querySelectorAll(".auth-tab").forEach((tab) => {
+    tab.addEventListener("click", () => ui.selectAuthTab(tab.id.replace("tab-", "")));
+    tab.addEventListener("keydown", (e) => {
+      const i = AUTH_TABS.indexOf(tab.id.replace("tab-", ""));
+      const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: AUTH_TABS.length - 1 }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      ui.selectAuthTab(AUTH_TABS[(next + AUTH_TABS.length) % AUTH_TABS.length], { focus: true });
+    });
+  });
+}
+
+function showSignIn() {
+  ui.selectAuthTab("signin");
+  ui.showScreen("onboard");
+}
+
+const USERNAME_RE = /^[a-z0-9_.]{3,30}$/;
+
+// Mirrors the server's rules so most mistakes show up without a round trip.
+// The server still checks everything.
+function checkNewAccountFields(form) {
+  const errors = {};
+  const username = form.elements.username.value.trim().toLowerCase();
+  const password = form.elements.password.value;
+  if (!USERNAME_RE.test(username)) {
+    errors.username = "Use 3 to 30 letters, numbers, underscores or dots.";
   }
+  if (password.length < 10) {
+    errors.password = "Password must be at least 10 characters.";
+  } else if (new TextEncoder().encode(password).length > 72) {
+    errors.password = "That password is too long. Use 72 characters or fewer.";
+  }
+  const email = form.elements.email?.value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = "That doesn't look like an email address.";
+  }
+  return errors;
+}
 
-  const btn = document.getElementById("create-user-btn");
-  btn.disabled = true;
-  btn.textContent = "Creating your profile…";
+// An empty field just says "Required." rather than repeating its format hint.
+function requireFields(form, names, errors) {
+  for (const name of names) {
+    if (!form.elements[name].value.trim()) errors[name] = "Required.";
+  }
+  return errors;
+}
 
+function showErrors(form, errors) {
+  for (const [field, message] of Object.entries(errors)) {
+    ui.setFieldError(form, field, message);
+  }
+  ui.focusFirstError(form);
+}
+
+// Turns an API response into inline errors. Each form passes the messages
+// that are specific to it (e.g. what a 401 means there).
+function showApiError(form, data, messages = {}) {
+  if (data.status === 400 && Array.isArray(data.errors)) {
+    const seen = new Set();
+    for (const err of data.errors) {
+      if (seen.has(err.path)) continue;
+      seen.add(err.path);
+      ui.setFieldError(form, err.path, err.msg === "Invalid value" ? "Check this field." : err.msg);
+    }
+  } else if (data.status === 409) {
+    const field = /email/i.test(data.error) ? "email" : "username";
+    ui.setFieldError(form, field, `${data.error}.`);
+  } else if (messages[data.status]) {
+    const { field, text } = messages[data.status];
+    if (field) ui.setFieldError(form, field, text);
+    else ui.setFormError(form, text);
+  } else if (data.status === 429) {
+    ui.setFormError(form, data.error || "Too many attempts. Try again later.");
+  } else {
+    ui.setFormError(form, "Something went wrong. Try again.");
+  }
+  ui.focusFirstError(form);
+}
+
+// Shared by all three forms: clear old errors, validate, call the API,
+// then either enter the app or show what went wrong.
+async function submitAuthForm(form, { errors, busyLabel, call, messages, onSuccess }) {
+  ui.clearAuthErrors(form);
+  if (Object.keys(errors).length) return showErrors(form, errors);
+
+  ui.setBusy(form, true, busyLabel);
   try {
-    const data = await api.createUser(name, location);
-    if (!data.success) throw new Error();
-    state.currentUser = data.user;
-    localStorage.setItem("tm_user_code", data.user.user_code);
-    enterApp();
-    ui.showToast(
-      `Welcome, ${data.user.name}. Your sign-in code is ${data.user.user_code}`,
-    );
+    const data = await call();
+    if (!data.success) return showApiError(form, data, messages);
+    // Hide passwords again so a manager saving the form sees a password field
+    form.querySelectorAll(".reveal-btn").forEach((btn) => ui.setPasswordVisible(btn, false));
+    onSuccess(data.user);
   } catch {
-    ui.showToast("Couldn't create your profile. Try again.");
+    ui.setFormError(form, "Couldn't reach TasteMind. Check your connection and try again.");
+    ui.focusFirstError(form);
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Create my taste profile";
+    ui.setBusy(form, false);
   }
 }
 
-async function handleLoadUser() {
-  const code = document.getElementById("returning-code").value.trim();
-  if (!code) return;
-  await fetchAndEnterApp(code);
+function handleSignIn(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  submitAuthForm(form, {
+    errors: requireFields(form, ["username", "password"], {}),
+    busyLabel: "Signing in…",
+    call: () => api.login(form.elements.username.value.trim(), form.elements.password.value),
+    messages: { 401: { text: "Wrong username or password." } },
+    onSuccess: enterApp,
+  });
 }
 
-async function fetchAndEnterApp(code) {
+function handleSignUp(e) {
+  e.preventDefault();
+  const form = e.currentTarget;
+  const value = (name) => form.elements[name].value.trim();
+  submitAuthForm(form, {
+    errors: requireFields(form, ["name", "username", "password", "location"], checkNewAccountFields(form)),
+    busyLabel: "Creating your account…",
+    call: () =>
+      api.signup({
+        name: value("name"),
+        username: value("username"),
+        password: form.elements.password.value,
+        location: value("location"),
+        email: value("email") || undefined,
+      }),
+    onSuccess: (user) => {
+      enterApp(user);
+      ui.showToast(`Welcome, ${user.name}`);
+    },
+  });
+}
+
+async function handleSignOut() {
   try {
-    const data = await api.getUser(code);
-    if (!data.success) throw new Error();
-    state.currentUser = data.user;
-    localStorage.setItem("tm_user_code", code);
-    enterApp();
+    await api.logout();
   } catch {
-    ui.showToast("No profile matches that code. Check it and try again.");
-    localStorage.removeItem("tm_user_code");
+    /* the local sign-out below still happens */
   }
+  leaveApp();
+  ui.showToast("Signed out");
 }
 
-function enterApp() {
+// The server rejected our session (expired, or signed out elsewhere).
+function handleSessionEnded() {
+  if (!state.currentUser) return;
+  leaveApp();
+  ui.showToast("Your session ended. Sign in again.");
+}
+
+function enterApp(user) {
+  state.currentUser = user;
+  document.querySelectorAll(".auth-form").forEach((form) => {
+    form.reset();
+    ui.clearAuthErrors(form);
+  });
   ui.showScreen("app");
-  document.body.classList.add("app-active"); // ← add this
+  document.body.classList.add("app-active");
+  ui.renderLocation(user.location);
   refreshHistory().then((visits) => {
     ui.renderHeader(state.currentUser, visits ? visits.length : 0);
     ui.renderTasteTags(state.currentUser);
     renderSidebar();
-    initLocation();
   });
 }
+
+function leaveApp() {
+  document.body.classList.remove("app-active");
+  state.currentUser = null;
+  state.selectedRating = 0;
+  state.pendingRateVisit = null;
+  restaurantStore.clear();
+  ui.clearHeader();
+  ui.closeDrawer();
+  ui.closeModal();
+  closeLocationEdit();
+  ui.renderEmpty();
+  document.getElementById("review-prompt").innerHTML = "";
+  document.getElementById("history-list").innerHTML = "";
+  document.getElementById("taste-tags").innerHTML = "";
+  document.getElementById("craving-input").value = "";
+  ui.selectAuthTab("signin");
+  ui.showScreen("onboard");
+}
+
+// ── STORAGE ────────────────────────────────────────
+// localStorage can throw (private mode, storage disabled); none of this is
+// critical, so failures are ignored.
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* not critical */
+  }
+}
+
+function removeStorage(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* not critical */
+  }
+}
+
 // ── PENDING VISITS ─────────────────────────────────
+// Meals saved with "I'm going here" but not reviewed yet. Kept on this
+// device, per user, so two people sharing a browser don't see each other's.
+const pendingKey = (userId) => `tm_pending_${userId}`;
+
+function readPending(key) {
+  try {
+    const list = JSON.parse(readStorage(key) || "[]");
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
 function getPending() {
-  return JSON.parse(localStorage.getItem("tm_pending") || "[]");
+  if (!state.currentUser) return [];
+  return readPending(pendingKey(state.currentUser.id));
 }
 
 function savePending(list) {
-  localStorage.setItem("tm_pending", JSON.stringify(list));
+  writeStorage(pendingKey(state.currentUser.id), JSON.stringify(list));
 }
 
 function addPending(restaurant) {
@@ -445,7 +609,7 @@ function renderSidebar() {
 // ── HISTORY ────────────────────────────────────────
 async function refreshHistory() {
   try {
-    const data = await api.getVisits(state.currentUser.user_code);
+    const data = await api.getVisits();
     const visits = data.visits || [];
     ui.renderHistory(visits);
     return visits;
@@ -473,7 +637,6 @@ async function handleGetRecommendations() {
 
   try {
     const data = await api.getRecommendations(
-      state.currentUser.user_code,
       craving,
       null,
       state.searchRadius,
@@ -532,19 +695,16 @@ async function handleSubmitReview() {
 
   try {
     // 1. Save visit to DB
-    const visitData = await api.saveVisit(
-      state.currentUser.user_code,
-      restaurant,
-    );
+    const visitData = await api.saveVisit(restaurant);
     if (!visitData.success) throw new Error();
 
     // 2. Save rating right after
-    await api.rateVisit(
-      state.currentUser.user_code,
+    const ratingData = await api.rateVisit(
       visitData.visit_id,
       state.selectedRating,
       notes,
     );
+    if (!ratingData.success) throw new Error();
 
     // 3. Remove from pending
     removePending(restaurant.place_id);
@@ -589,7 +749,6 @@ async function handleSubmitRating() {
 
   try {
     const data = await api.rateVisit(
-      state.currentUser.user_code,
       visit_id,
       state.selectedRating,
       notes,
@@ -614,7 +773,7 @@ async function handleSubmitRating() {
 // ── TASTE AUTO-UPDATE ──────────────────────────────
 async function autoUpdateTaste() {
   try {
-    const visitsData = await api.getVisits(state.currentUser.user_code);
+    const visitsData = await api.getVisits();
     const visits = visitsData.visits || [];
 
     const liked = [
@@ -626,10 +785,8 @@ async function autoUpdateTaste() {
     ];
 
     if (liked.length > 0) {
-      await api.updateTaste(state.currentUser.user_code, {
-        liked_cuisines: liked,
-      });
-      const userData = await api.getUser(state.currentUser.user_code);
+      await api.updateTaste({ liked_cuisines: liked });
+      const userData = await api.me();
       if (userData.success) {
         state.currentUser = userData.user;
         ui.renderTasteTags(state.currentUser);
