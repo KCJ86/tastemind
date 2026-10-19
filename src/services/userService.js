@@ -4,32 +4,6 @@
  * Summary: User service — all DB queries, now using PostgreSQL
  */
 const { pool } = require("../db/database");
-const crypto = require("crypto");
-
-const generateUserCode = (name) => {
-  const slug = name.toLowerCase().split(" ")[0];
-  const suffix = crypto.randomBytes(2).toString("hex");
-  return `${slug}_${suffix}`;
-};
-
-const createUser = async (name, location) => {
-  const user_code = generateUserCode(name);
-  const client = await pool.connect();
-  try {
-    const userResult = await client.query(
-      `INSERT INTO users (name, user_code, location)
-       VALUES ($1, $2, $3) RETURNING id`,
-      [name, user_code, location],
-    );
-    const user_id = userResult.rows[0].id;
-    await client.query(`INSERT INTO taste_profiles (user_id) VALUES ($1)`, [
-      user_id,
-    ]);
-    return getUserById(user_id);
-  } finally {
-    client.release();
-  }
-};
 
 // Never SELECT u.* for anything sent to the client — it would include
 // password_hash. Add new user columns here deliberately.
@@ -44,18 +18,6 @@ const getUserById = async (id) => {
      LEFT JOIN taste_profiles tp ON tp.user_id = u.id
      WHERE u.id = $1`,
     [id],
-  );
-  return result.rows[0] || null;
-};
-
-const getUserByCode = async (user_code) => {
-  const result = await pool.query(
-    `SELECT ${PUBLIC_USER_COLUMNS}, tp.liked_cuisines, tp.disliked_cuisines,
-            tp.preferred_price_range, tp.dietary_restrictions
-     FROM users u
-     LEFT JOIN taste_profiles tp ON tp.user_id = u.id
-     WHERE u.user_code = $1`,
-    [user_code],
   );
   return result.rows[0] || null;
 };
@@ -151,9 +113,7 @@ const logRecommendation = async (user_id) => {
 };
 
 module.exports = {
-  createUser,
   getUserById,
-  getUserByCode,
   updateTasteProfile,
   getRecentVisits,
   saveVisit,

@@ -21,15 +21,36 @@ process.env.DATABASE_SSL = "false";
 process.env.NODE_ENV = "test";
 process.env.BCRYPT_ROUNDS = process.env.BCRYPT_ROUNDS || "4";
 
+// Tests must never call the real Claude, Voyage, or Google APIs with real
+// keys and test data. Fake keys make any missed call fail, and the services
+// routes do reach (rating → embeddings, location → geocoding) are stubbed.
+// Stubs must be installed before src/app is required, because routes
+// destructure these functions when they load.
+process.env.ANTHROPIC_API_KEY = "test-not-a-real-key";
+process.env.VOYAGE_API_KEY = "test-not-a-real-key";
+process.env.GOOGLE_MAPS_API_KEY = "test-not-a-real-key";
+
+const embeddingService = require("../src/services/embeddingService");
+const fakeVector = () => Array.from({ length: 1024 }, (_, i) => (i === 0 ? 1 : 0));
+embeddingService.embedDocuments = async (texts) => texts.map(fakeVector);
+embeddingService.embedQuery = async () => fakeVector();
+
+const mapsService = require("../src/services/mapsService");
+mapsService.getUserCoordinates = async () => ({ latitude: 32.7157, longitude: -117.1611 });
+mapsService.getResolvedLocationName = async (input) => `${input} (resolved)`;
+
 const request = require("supertest");
 const app = require("../src/app");
 const { pool, initDb } = require("../src/db/database");
 
+// IDs are deliberately NOT restarted: rate limiters keep per-user counts in
+// memory for the whole file, so a reused user id would inherit another
+// test's count (and real databases never reuse ids anyway).
 const resetDb = async () => {
   await pool.query(`
     TRUNCATE users, taste_profiles, visits, ratings, recommendation_logs,
              reservations, sessions
-      RESTART IDENTITY CASCADE;
+      CASCADE;
     UPDATE app_settings SET value = NOW()::text WHERE key = 'claim_opens_at';
   `);
 };
@@ -49,6 +70,13 @@ const post = (path, body, ip = nextIp()) =>
 const get = (path, cookie) => {
   const req = request(app).get(path).set("X-Forwarded-For", nextIp());
   return cookie ? req.set("Cookie", cookie) : req;
+};
+
+// Any method, optionally signed in. `ip` lets a test share one IP.
+const send = (method, path, { cookie, body, ip = nextIp() } = {}) => {
+  const req = request(app)[method](path).set("X-Forwarded-For", ip);
+  if (cookie) req.set("Cookie", cookie);
+  return body === undefined ? req : req.send(body);
 };
 
 // "tm_session=<token>" from a response, for sending back as a Cookie header.
@@ -95,6 +123,7 @@ module.exports = {
   nextIp,
   post,
   get,
+  send,
   sessionCookie,
   signup,
   createLegacyUser,

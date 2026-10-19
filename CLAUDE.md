@@ -56,7 +56,7 @@ Express 5 backend (`src/`) plus a vanilla JS frontend (`public/`) in one Railway
 - The star rating is intentionally **not** embedded, only cuisine, name, and notes. The rating is passed to Claude as metadata instead.
 - If you change `EMBEDDING_MODEL` or the dimensions, update `vector(1024)` in `database.js` and run the backfill.
 
-**Ownership**: users are identified only by `user_code` (no passwords or auth). Every route resolves `user_code` → `user.id`, and queries must scope by `user_id`. For example, `saveRating` checks that the visit belongs to the user.
+**Auth and ownership**: accounts use a username and a bcrypt password (`src/routes/auth.js`, `src/services/authService.js`). Sessions are a random token in the httpOnly `tm_session` cookie; only its SHA-256 is stored in `sessions`. User and recommendation routes sit behind `requireAuth` and act only on `req.user`. They live under `/api/v1/users/me/...`, and no route takes a user identifier from the URL or body. Queries must still scope by `user_id`; for example, `saveRating` checks that the visit belongs to the user. Pre-accounts users have a `user_code` and no password. They can upgrade once via `/auth/claim`, which is open for 30 days from `app_settings.claim_opens_at` and clears `user_code`. Never `SELECT u.*` for anything sent to the client, because it includes `password_hash`; use `PUBLIC_USER_COLUMNS` in `userService.js`. A `checkOrigin` middleware rejects cross-site `POST`/`PATCH` requests to `/api` (CSRF).
 
 **Taste profile updates happen client-side**: after a rating of 4 or more, `public/js/app.js` `autoUpdateTaste()` recomputes `liked_cuisines` from history and PATCHes `/users/:code/taste`. The server does not do this.
 

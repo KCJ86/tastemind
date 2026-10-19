@@ -31,13 +31,8 @@ const limiter = rateLimit({
   message: { error: "Too many requests, please slow down." },
 });
 app.use("/api/", limiter);
-
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  message: { error: "AI recommendation limit reached, wait a moment." },
-});
-app.use("/api/v1/recommendations", aiLimiter);
+// The per-user AI limiter lives in routes/recommendations.js, after the
+// session is known.
 
 // ─── General Middleware ────────────────────────────────
 if (process.env.NODE_ENV !== "test") app.use(morgan("dev"));
