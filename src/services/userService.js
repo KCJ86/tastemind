@@ -77,7 +77,7 @@ const saveVisit = async (user_id, restaurant) => {
       restaurant.address || null,
     ],
   );
-  return { lastInsertRowid: result.rows[0].id };
+  return { id: result.rows[0].id };
 };
 
 // Only inserts if the visit belongs to this user. Returns false otherwise.

@@ -139,7 +139,7 @@ router.post(
       const visit = await saveVisit(req.user.id, req.body);
       res.status(201).json({
         success: true,
-        visit_id: visit.lastInsertRowid,
+        visit_id: visit.id,
         message: "Enjoy your meal! Don't forget to rate it after 🍽️",
       });
     } catch (err) {

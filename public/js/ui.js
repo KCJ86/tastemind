@@ -13,6 +13,9 @@ const ICONS = {
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>',
   meals:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3 4-3 7h3"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.9 9.9 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
 };
 
 const ui = {
@@ -115,17 +118,10 @@ const ui = {
         <div class="menu" id="user-dropdown" style="display:none">
           <div class="menu-head">
             <div class="menu-name">${ui.esc(user.name)}</div>
+            <div class="menu-sub">@${ui.esc(user.username)}</div>
             <div class="menu-sub dropdown-location">${ui.esc(user.location || "No location set")}</div>
-            <button class="code-row" id="copy-code-btn">
-              <span>
-                <span class="code-label">Your sign-in code</span><br />
-                <span class="code-value">${ui.esc(user.user_code)}</span>
-              </span>
-              <span class="code-copy">Copy</span>
-            </button>
             <p class="menu-stats">${visitCount} ${visitCount === 1 ? "meal" : "meals"} reviewed, ${liked.length} favorite ${liked.length === 1 ? "cuisine" : "cuisines"}</p>
           </div>
-          <button class="menu-item" id="dropdown-home">Back to start</button>
           <button class="menu-item danger" id="dropdown-signout">Sign out</button>
         </div>
       </div>
@@ -135,6 +131,82 @@ const ui = {
   clearHeader: () => {
     document.getElementById("header-right").innerHTML = "";
     document.getElementById("greeting").textContent = "";
+  },
+
+  // ── SIGN-IN SCREEN ────────────────────────────────
+  // Three tabs (sign in / create account / old code), each a real <form>.
+  selectAuthTab: (name, { focus = false } = {}) => {
+    document.querySelectorAll(".auth-tab").forEach((tab) => {
+      const on = tab.id === `tab-${name}`;
+      tab.setAttribute("aria-selected", String(on));
+      tab.tabIndex = on ? 0 : -1;
+      if (on && focus) tab.focus();
+    });
+    document.querySelectorAll(".auth-form").forEach((form) => {
+      form.hidden = form.id !== `form-${name}`;
+    });
+  },
+
+  // Field errors sit under their field and are linked with aria-describedby,
+  // so screen readers read them with the field. `field` is the input's
+  // name attribute, which matches the API's error `path`.
+  setFieldError: (form, field, message) => {
+    const input = form.elements[field];
+    const error = document.getElementById(`${form.id.replace("form-", "")}-${field}-error`);
+    if (!input || !error) return ui.setFormError(form, message);
+    error.textContent = message;
+    error.hidden = false;
+    input.setAttribute("aria-invalid", "true");
+    const ids = new Set((input.getAttribute("aria-describedby") || "").split(" ").filter(Boolean));
+    ids.add(error.id);
+    input.setAttribute("aria-describedby", [...ids].join(" "));
+  },
+
+  setFormError: (form, message) => {
+    const error = form.querySelector(".form-error");
+    error.textContent = message;
+    error.hidden = false;
+  },
+
+  clearAuthErrors: (form) => {
+    form.querySelectorAll(".field-error, .form-error").forEach((el) => {
+      el.hidden = true;
+      el.textContent = "";
+    });
+    form.querySelectorAll("[aria-invalid]").forEach((input) => {
+      input.removeAttribute("aria-invalid");
+      const ids = (input.getAttribute("aria-describedby") || "")
+        .split(" ")
+        .filter((id) => id && !id.endsWith("-error"));
+      if (ids.length) input.setAttribute("aria-describedby", ids.join(" "));
+      else input.removeAttribute("aria-describedby");
+    });
+  },
+
+  // Moves focus to the first problem so keyboard and screen reader users
+  // land on it, the way native form validation does.
+  focusFirstError: (form) => {
+    const target =
+      form.querySelector("[aria-invalid='true']") ||
+      form.querySelector(".form-error:not([hidden])");
+    if (!target) return;
+    if (target.classList.contains("form-error")) target.tabIndex = -1;
+    target.focus();
+  },
+
+  setPasswordVisible: (button, visible) => {
+    const input = document.getElementById(button.getAttribute("aria-controls"));
+    input.type = visible ? "text" : "password";
+    button.setAttribute("aria-pressed", String(visible));
+    button.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+    button.innerHTML = visible ? ICONS.eyeOff : ICONS.eye;
+  },
+
+  setBusy: (form, busy, label) => {
+    const btn = form.querySelector("[type='submit']");
+    if (busy) btn.dataset.label = btn.textContent;
+    btn.disabled = busy;
+    btn.textContent = busy ? label : btn.dataset.label || btn.textContent;
   },
 
   // ── LOCATION ──────────────────────────────────────
