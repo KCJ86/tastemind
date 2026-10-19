@@ -11,7 +11,20 @@ npm start                    # production start (Railway)
 npm run backfill:embeddings  # embed any rated visits missing an up-to-date embedding (idempotent)
 ```
 
-There is no test suite, linter, or build step. The frontend is plain static files served by Express, so frontend edits need only a browser refresh.
+### Local database
+
+Local Postgres 18 + pgvector runs from the conda env `tastemind-pg` (Homebrew is broken on this Mac), with data in `~/pgdata/tastemind` (outside the repo) on **port 5433**. It must be running before `npm run dev` or tests.
+
+```bash
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind -l ~/pgdata/tastemind.log start
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind stop
+conda run -n tastemind-pg pg_ctl -D ~/pgdata/tastemind status
+conda run -n tastemind-pg psql -h ~/pgdata/tastemind -p 5433 -U postgres -d tastemind_dev   # superuser shell (socket, no password)
+```
+
+Databases: `tastemind_dev` (`DATABASE_URL`, restored from a production backup, so it holds real user data) and `tastemind_test` (`TEST_DATABASE_URL`, wiped by tests). Both are owned by the non-superuser role `tastemind`; the `vector` extension was pre-created by `postgres` because `tastemind` can't create it. The `.env` file has no Railway URLs. Never point `DATABASE_URL` or `TEST_DATABASE_URL` at Railway when running locally.
+
+There is no linter or build step. The frontend is plain static files served by Express, so frontend edits need only a browser refresh.
 
 Required env (see `.env.example`): `ANTHROPIC_API_KEY`, `GOOGLE_MAPS_API_KEY` (Places API (New) + Geocoding), `DATABASE_URL` (PostgreSQL). Optional: `VOYAGE_API_KEY` (embeddings for RAG), `CLAUDE_MODEL` (overrides the default in `claudeService.js`), `DATABASE_SSL=true` (needed for Railway's public URL), `FRONTEND_URL` (CORS origin).
 
